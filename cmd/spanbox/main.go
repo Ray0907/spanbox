@@ -1,13 +1,21 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/pricing"
+	"github.com/Ray0907/spanbox/internal/store"
+	"github.com/Ray0907/spanbox/internal/web"
 )
 
 var version = "dev"
@@ -23,8 +31,52 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := pricing.Load(cfg.PricingFile); err != nil {
+	prices, err := pricing.Load(cfg.PricingFile)
+	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("spanbox %s configuration loaded on port %d", version, cfg.Port)
+	database, err := store.Open(cfg.DataDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer database.Close()
+	if cfg.AuthToken == "" {
+		log.Print("warning: AUTH_TOKEN is not set; ingest and UI are unauthenticated")
+	}
+	if cfg.RetentionDays != 0 {
+		go runRetention(database, cfg.RetentionDays)
+	}
+	server := web.NewServer(web.Deps{Cfg: cfg, Store: database, Pricing: prices, Version: version, Logf: log.Printf})
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("shutdown: %v", err)
+		}
+	}()
+	log.Printf("spanbox %s listening on %s", version, server.Addr)
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+}
+
+func runRetention(database *store.Store, days int) {
+	purge := func() {
+		cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour).UnixNano()
+		deleted, err := database.Purge(context.Background(), cutoff)
+		if err != nil {
+			log.Printf("retention: %v", err)
+		} else if deleted > 0 {
+			log.Printf("retention: deleted %d traces", deleted)
+		}
+	}
+	purge()
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		purge()
+	}
 }
