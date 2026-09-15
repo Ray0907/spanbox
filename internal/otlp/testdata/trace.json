@@ -1,0 +1,70 @@
+{
+  "resourceSpans": [{
+    "resource": {
+      "attributes": [{"key": "service.name", "value": {"stringValue": "demo"}}]
+    },
+    "scopeSpans": [{
+      "scope": {
+        "name": "test",
+        "version": "1",
+        "attributes": [{"key": "scope.attribute", "value": {"stringValue": "present"}}]
+      },
+      "spans": [
+        {
+          "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
+          "spanId": "ERITFBUWFxg=",
+          "name": "agent-root",
+          "startTimeUnixNano": "1000000000",
+          "endTimeUnixNano": "1300000000",
+          "attributes": [{"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}}]
+        },
+        {
+          "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
+          "spanId": "ISIjJCUmJyg=",
+          "parentSpanId": "ERITFBUWFxg=",
+          "traceState": "vendor=value",
+          "name": "chat gpt-4o",
+          "startTimeUnixNano": "1050000000",
+          "endTimeUnixNano": "1250000000",
+          "status": {"code": "STATUS_CODE_OK"},
+          "attributes": [
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+            {"key": "gen_ai.provider.name", "value": {"stringValue": "openai"}},
+            {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}},
+            {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "100"}},
+            {"key": "gen_ai.usage.output_tokens", "value": {"intValue": "20"}},
+            {"key": "gen_ai.input.messages", "value": {"stringValue": "[{\"role\":\"user\",\"content\":\"What is the weather?\"}]"}},
+            {"key": "bytes.attribute", "value": {"bytesValue": "AAEC"}},
+            {"key": "nested.attribute", "value": {"kvlistValue": {"values": [
+              {"key": "enabled", "value": {"boolValue": true}},
+              {"key": "items", "value": {"arrayValue": {"values": [{"stringValue": "one"}, {"intValue": "2"}]}}}
+            ]}}}
+          ],
+          "events": [{
+            "timeUnixNano": "1100000000",
+            "name": "first-token",
+            "attributes": [{"key": "index", "value": {"intValue": "1"}}]
+          }],
+          "links": [{
+            "traceId": "QUJDREVGR0hJSktMTU5PUA==",
+            "spanId": "UVJTVFVWV1g=",
+            "traceState": "linked=yes",
+            "attributes": [{"key": "relation", "value": {"stringValue": "follows"}}]
+          }]
+        },
+        {
+          "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
+          "spanId": "MTIzNDU2Nzg=",
+          "parentSpanId": "ISIjJCUmJyg=",
+          "name": "lookup-weather",
+          "startTimeUnixNano": "1120000000",
+          "endTimeUnixNano": "1180000000",
+          "attributes": [
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+            {"key": "gen_ai.tool.name", "value": {"stringValue": "weather"}}
+          ]
+        }
+      ]
+    }]
+  }]
+}
