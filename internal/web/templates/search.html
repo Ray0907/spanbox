@@ -1,0 +1,16 @@
+{{define "content"}}
+<section class="page-heading"><div><h1>Search</h1><p>Find a literal phrase in span names, prompts, and completions.</p></div></section>
+<form class="search-form" method="get" action="/search">
+  <label for="search-query">Phrase</label>
+  <input id="search-query" name="q" value="{{.Query}}" placeholder="What is the weather?" autofocus>
+  <button type="submit">Search</button>
+</form>
+{{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
+{{if .Query}}<section class="search-results"><h2>Results for “{{.Query}}”</h2>
+  {{range .Hits}}<article>
+    <div><span class="kind {{.Kind}}">{{.Kind}}</span><a href="/traces/{{.TraceID}}">{{.TraceName}}</a><span>/</span><strong>{{.SpanName}}</strong></div>
+    <p>{{if .Model}}{{.Model}} · {{end}}{{timeUTC .StartNs}}</p>
+    <pre>{{.Snippet}}</pre>
+  </article>{{else}}<p class="empty-state">No matching spans. Try a shorter literal phrase.</p>{{end}}
+</section>{{end}}
+{{end}}

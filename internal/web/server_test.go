@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/pricing"
@@ -44,6 +46,19 @@ func traceFixture(t *testing.T) ([]byte, []byte) {
 	}
 	var request collectortracepb.ExportTraceServiceRequest
 	if err := protojson.Unmarshal(jsonBody, &request); err != nil {
+		t.Fatal(err)
+	}
+	base := uint64(time.Now().UTC().Add(-time.Minute).UnixNano())
+	for _, resource := range request.ResourceSpans {
+		for _, scope := range resource.ScopeSpans {
+			for _, span := range scope.Spans {
+				span.StartTimeUnixNano = base + span.StartTimeUnixNano - 1_000_000_000
+				span.EndTimeUnixNano = base + span.EndTimeUnixNano - 1_000_000_000
+			}
+		}
+	}
+	jsonBody, err = protojson.Marshal(&request)
+	if err != nil {
 		t.Fatal(err)
 	}
 	protoBody, err := proto.Marshal(&request)
@@ -207,6 +222,63 @@ func TestTracePages(t *testing.T) {
 	response = request(t, handler, http.MethodGet, "/", "", "", nil)
 	if !strings.Contains(response.Body.String(), "&lt;script&gt;x&lt;/script&gt;") || strings.Contains(response.Body.String(), "<script>x</script>") {
 		t.Fatalf("telemetry was not escaped: %q", response.Body.String())
+	}
+}
+
+func TestDashboardSearchAndSQLPages(t *testing.T) {
+	handler, _ := newTestHandler(t, "")
+	jsonBody, _ := traceFixture(t)
+	if response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", jsonBody); response.Code != http.StatusOK {
+		t.Fatalf("ingest status=%d", response.Code)
+	}
+
+	response := request(t, handler, http.MethodGet, "/dashboard/data?range=7d", "", "", nil)
+	var dashboard store.DashboardData
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &dashboard) != nil {
+		t.Fatalf("dashboard data status=%d body=%q", response.Code, response.Body.String())
+	}
+	if dashboard.TraceCount != 1 || len(dashboard.Models) == 0 || dashboard.Models[0].Model != "gpt-4o" || len(dashboard.Days) == 0 {
+		t.Fatalf("unexpected dashboard: %+v", dashboard)
+	}
+	response = request(t, handler, http.MethodGet, "/dashboard", "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `data-chart="cost"`) {
+		t.Fatalf("dashboard page status=%d body=%q", response.Code, response.Body.String())
+	}
+	response = request(t, handler, http.MethodGet, "/search?q=weather", "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "agent-root") {
+		t.Fatalf("search status=%d body=%q", response.Code, response.Body.String())
+	}
+	response = request(t, handler, http.MethodGet, "/sql", "", "", nil)
+	if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "set AUTH_TOKEN to enable") {
+		t.Fatalf("disabled SQL status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	authed, _ := newTestHandler(t, "secret")
+	ingest := httptest.NewRequest(http.MethodPost, "/v1/traces", bytes.NewReader(jsonBody))
+	ingest.Header.Set("Content-Type", "application/json")
+	ingest.Header.Set("Authorization", "Bearer secret")
+	ingestResponse := httptest.NewRecorder()
+	authed.ServeHTTP(ingestResponse, ingest)
+	if ingestResponse.Code != http.StatusOK {
+		t.Fatalf("authenticated ingest status=%d", ingestResponse.Code)
+	}
+	cookie := &http.Cookie{Name: "spanbox_session", Value: sessionValue("secret")}
+	postSQL := func(query string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/sql", strings.NewReader(url.Values{"sql": {query}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(cookie)
+		result := httptest.NewRecorder()
+		authed.ServeHTTP(result, req)
+		return result
+	}
+	response = postSQL("SELECT count(*) AS n FROM spans")
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "3") {
+		t.Fatalf("SQL response status=%d body=%q", response.Code, response.Body.String())
+	}
+	response = postSQL("ATTACH DATABASE '/tmp/x' AS x")
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "rejected") {
+		t.Fatalf("rejected SQL status=%d body=%q", response.Code, response.Body.String())
 	}
 }
 

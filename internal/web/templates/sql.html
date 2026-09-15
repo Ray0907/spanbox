@@ -1,0 +1,26 @@
+{{define "content"}}
+<section class="page-heading"><div><h1>SQL console</h1><p>Read-only access for authenticated operators. Queries stop after five seconds.</p></div></section>
+<div class="sql-layout">
+  <section>
+    <form class="sql-form" method="post" action="/sql">
+      <label for="sql-query">Query</label>
+      <textarea id="sql-query" name="sql" rows="9" spellcheck="false" required>{{.Query}}</textarea>
+      <button type="submit">Run query</button>
+    </form>
+    {{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
+    {{if .HasResult}}<section class="sql-result"><div class="section-heading"><h2>Result</h2><span>{{len .Result.Rows}} rows · {{elapsed .Result.Elapsed}}{{if .Result.Truncated}} · truncated{{end}}</span></div>
+      <div class="table-wrap"><table><thead><tr>{{range .Result.Columns}}<th>{{.}}</th>{{end}}</tr></thead><tbody>
+      {{range .Result.Rows}}<tr>{{range .}}<td><pre>{{.}}</pre></td>{{end}}</tr>{{else}}<tr><td class="empty" colspan="64">Query returned no rows.</td></tr>{{end}}
+      </tbody></table></div>
+    </section>{{end}}
+  </section>
+  <aside class="sql-help">
+    <h2>Schema</h2>
+    {{range .Schema}}<details><summary>{{.Name}}</summary><p>{{join .Columns ", "}}</p></details>{{end}}
+    <h2>Examples</h2>
+    <pre>SELECT * FROM traces ORDER BY start_ns DESC LIMIT 20;</pre>
+    <pre>SELECT request_model, count(*) FROM spans WHERE kind='llm' GROUP BY request_model;</pre>
+    <pre>SELECT trace_id, name, cost_usd FROM traces WHERE has_error=1;</pre>
+  </aside>
+</div>
+{{end}}

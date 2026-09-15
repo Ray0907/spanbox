@@ -6,7 +6,9 @@
   <meta name="color-scheme" content="light dark">
   <title>{{if .Title}}{{.Title}} · {{end}}spanbox</title>
   <link rel="stylesheet" href="/static/app.css">
+  {{if .Charts}}<link rel="stylesheet" href="/static/uPlot.min.css">{{end}}
   <script src="/static/htmx.min.js" defer></script>
+  {{if .Charts}}<script src="/static/uPlot.min.js" defer></script><script src="/static/app.js" defer></script>{{end}}
 </head>
 <body>
   <!--

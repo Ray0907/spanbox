@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"math"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,6 +24,7 @@ var webFiles embed.FS
 type layoutData struct {
 	Title      string
 	SQLEnabled bool
+	Charts     bool
 	Version    string
 }
 
@@ -201,6 +203,156 @@ func buildTree(spans []store.Span) []*spanNode {
 	return roots
 }
 
+type dashboardPage struct {
+	layoutData
+	Range string
+	Data  store.DashboardData
+	Error string
+}
+
+func (deps Deps) dashboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	rangeValue := r.URL.Query().Get("range")
+	if rangeValue == "" {
+		rangeValue = "24h"
+	}
+	from, to, err := parseRange(rangeValue, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+	page := dashboardPage{layoutData: layoutData{Title: "Dashboard", SQLEnabled: deps.Cfg.AuthToken != "", Charts: true, Version: deps.Version}, Range: rangeValue}
+	if err == nil {
+		page.Data, err = deps.Store.Dashboard(r.Context(), from, to)
+	}
+	if err != nil {
+		page.Error = err.Error()
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/dashboard.html")
+}
+
+func (deps Deps) dashboardData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	rangeValue := r.URL.Query().Get("range")
+	if rangeValue == "" {
+		rangeValue = "24h"
+	}
+	from, to, err := parseRange(rangeValue, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	data, err := deps.Store.Dashboard(r.Context(), from, to)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		deps.Logf("encode dashboard: %v", err)
+	}
+}
+
+type searchPage struct {
+	layoutData
+	Query string
+	Hits  []store.SearchHit
+	Error string
+}
+
+func (deps Deps) search(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	page := searchPage{layoutData: layoutData{Title: "Search", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Query: r.URL.Query().Get("q")}
+	var err error
+	if page.Query != "" {
+		page.Hits, err = deps.Store.Search(r.Context(), page.Query, 100)
+	}
+	if err != nil {
+		page.Error = err.Error()
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/search.html")
+}
+
+type schemaTable struct {
+	Name    string
+	Columns []string
+}
+
+type sqlPage struct {
+	layoutData
+	Query     string
+	Result    store.SQLResult
+	HasResult bool
+	Error     string
+	Schema    []schemaTable
+}
+
+func (deps Deps) sqlPage(w http.ResponseWriter, r *http.Request) {
+	if deps.Cfg.AuthToken == "" {
+		http.Error(w, "SQL console disabled: set AUTH_TOKEN to enable", http.StatusNotFound)
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	page := sqlPage{layoutData: layoutData{Title: "SQL", SQLEnabled: true, Version: deps.Version}}
+	page.Schema = deps.schema(r)
+	status := http.StatusOK
+	if r.Method == http.MethodPost {
+		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || mediaType != "application/x-www-form-urlencoded" {
+			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 20<<10)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		page.Query = r.PostForm.Get("sql")
+		page.Result, err = deps.Store.RunUserSQL(r.Context(), page.Query)
+		if err != nil {
+			page.Error = err.Error()
+			status = http.StatusBadRequest
+		} else {
+			page.HasResult = true
+		}
+	}
+	if status != http.StatusOK {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/sql.html")
+}
+
+func (deps Deps) schema(r *http.Request) []schemaTable {
+	var result []schemaTable
+	for _, table := range []string{"traces", "spans", "spans_fts"} {
+		rows, err := deps.Store.Reader().QueryContext(r.Context(), "PRAGMA table_info("+table+")")
+		if err != nil {
+			continue
+		}
+		entry := schemaTable{Name: table}
+		for rows.Next() {
+			var id, notNull, primaryKey int
+			var name, kind string
+			var defaultValue sql.NullString
+			if rows.Scan(&id, &name, &kind, &notNull, &defaultValue, &primaryKey) == nil {
+				entry.Columns = append(entry.Columns, name+" "+kind)
+			}
+		}
+		rows.Close()
+		result = append(result, entry)
+	}
+	return result
+}
+
 func (deps Deps) span(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -324,6 +476,9 @@ func (deps Deps) render(w http.ResponseWriter, name string, data any, files ...s
 			return fmt.Sprintf("$%.6f", *value)
 		},
 		"duration": func(ms float64) string { return fmt.Sprintf("%.1f ms", ms) },
+		"percent":  func(value float64) string { return fmt.Sprintf("%.1f%%", value*100) },
+		"elapsed":  func(value time.Duration) string { return value.Round(time.Millisecond).String() },
+		"join":     strings.Join,
 		"spanModel": func(span store.Span) string {
 			if span.ResponseModel != "" {
 				return span.ResponseModel
