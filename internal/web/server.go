@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -37,14 +38,14 @@ func NewHandler(deps Deps) http.Handler {
 	})
 	mux.HandleFunc("/v1/traces", deps.ingest)
 	mux.HandleFunc("/login", deps.login)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintln(w, "spanbox")
-	})
+	staticFiles, err := fs.Sub(webFiles, "static")
+	if err != nil {
+		panic(err)
+	}
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles))))
+	mux.HandleFunc("/traces/", deps.trace)
+	mux.HandleFunc("/spans/", deps.span)
+	mux.HandleFunc("/", deps.traces)
 	return headers(recoverPanics(deps.Logf, authenticate(deps.Cfg.AuthToken, mux)))
 }
 

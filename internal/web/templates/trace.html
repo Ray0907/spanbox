@@ -1,0 +1,29 @@
+{{define "content"}}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Traces</a><span>/</span><span>{{.Trace.Name}}</span></nav>
+<section class="trace-heading">
+  <div><h1>{{.Trace.Name}}</h1><p>{{.Trace.ServiceName}} · {{timeUTC .Trace.StartNs}}</p></div>
+  <div class="trace-summary"><span>{{.Trace.SpanCount}} spans</span><span>{{tokens .Trace.InputTokens}} / {{tokens .Trace.OutputTokens}} tokens</span><span>{{money .Trace.CostUSD}}</span><span>{{duration .Trace.DurationMs}}</span></div>
+</section>
+<div class="trace-layout">
+  <section class="span-tree" aria-label="Span tree">
+    <h2>Span tree</h2>
+    {{range .Roots}}{{template "node" .}}{{end}}
+  </section>
+  <section id="panel" class="span-panel" aria-live="polite">
+    {{if .Selected}}{{template "span" .Selected}}{{else}}<p class="empty">Select a span to inspect it.</p>{{end}}
+  </section>
+</div>
+{{end}}
+{{define "node"}}
+<details class="tree-node" open>
+  <summary hx-get="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-target="#panel" hx-swap="innerHTML">
+    <span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span>
+    <span class="tree-name">{{.Span.Name}}</span>
+    <span class="tree-model">{{spanModel .Span}}</span>
+    <span class="tree-tokens">{{tokens .Span.InputTokens}} / {{tokens .Span.OutputTokens}}</span>
+    <span class="tree-duration">{{duration .Span.DurationMs}}</span>
+    <meter min="0" max="100" value="{{.Width}}" aria-label="Relative duration {{.Width}} percent"></meter>
+  </summary>
+  <div class="children">{{range .Children}}{{template "node" .}}{{end}}</div>
+</details>
+{{end}}

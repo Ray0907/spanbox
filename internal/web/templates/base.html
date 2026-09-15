@@ -1,0 +1,34 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{{if .Title}}{{.Title}} · {{end}}spanbox</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <!--
+  THESIS: A trace workbench where hierarchy and evidence outrank decorative metrics.
+  OWN-WORLD: Cool neutral surfaces, crisp rules, compact controls, and one blue action color.
+  STORY: Operators find a trace, scan its structure, then inspect the exact telemetry behind it.
+  FIRST VIEWPORT: A slim navigation rail tops a dense filter bar and full-width operational table.
+  FORM: Restrained observability console, fixed by the normative product specification.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+  -->
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="spanbox traces"><span class="brand-mark"></span>spanbox</a>
+    <nav aria-label="Primary navigation">
+      <a href="/">Traces</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/search">Search</a>
+      {{if .SQLEnabled}}<a href="/sql">SQL</a>{{end}}
+    </nav>
+    <span class="utc-note">Times in UTC</span>
+  </header>
+  <main class="shell">
+    {{template "content" .}}
+  </main>
+</body>
+</html>{{end}}

@@ -170,6 +170,46 @@ func TestIngestEndpoint(t *testing.T) {
 	}
 }
 
+func TestTracePages(t *testing.T) {
+	handler, database := newTestHandler(t, "")
+	jsonBody, _ := traceFixture(t)
+	if response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", jsonBody); response.Code != http.StatusOK {
+		t.Fatalf("ingest status=%d", response.Code)
+	}
+	response := request(t, handler, http.MethodGet, "/", "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "agent-root") || !strings.Contains(response.Body.String(), "gpt-4o") {
+		t.Fatalf("trace list status=%d body=%q", response.Code, response.Body.String())
+	}
+	partial := request(t, handler, http.MethodGet, "/?partial=1&errors=1", "", "", nil)
+	if partial.Code != http.StatusOK || strings.Contains(partial.Body.String(), "agent-root") || !strings.Contains(partial.Body.String(), "<tbody") {
+		t.Fatalf("partial response status=%d body=%q", partial.Code, partial.Body.String())
+	}
+	traceID := "0102030405060708090a0b0c0d0e0f10"
+	response = request(t, handler, http.MethodGet, "/traces/"+traceID, "", "", nil)
+	for _, name := range []string{"agent-root", "chat gpt-4o", "lookup-weather"} {
+		if !strings.Contains(response.Body.String(), name) {
+			t.Fatalf("trace detail missing %q: %q", name, response.Body.String())
+		}
+	}
+	response = request(t, handler, http.MethodGet, "/spans/"+traceID+"/2122232425262728", "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "What is the weather?") || !strings.Contains(response.Body.String(), "100") {
+		t.Fatalf("span detail status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	malicious := store.Span{
+		TraceID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", SpanID: "bbbbbbbbbbbbbbbb", Name: "<script>x</script>", Kind: "other",
+		ServiceName: "demo", StartNs: 2_000_000_000, EndNs: 3_000_000_000, DurationMs: 1000,
+		Attributes: "{}", Events: "[]", Links: "[]", Resource: "{}", Scope: "{}",
+	}
+	if err := database.InsertBatch(context.Background(), []store.Span{malicious}); err != nil {
+		t.Fatal(err)
+	}
+	response = request(t, handler, http.MethodGet, "/", "", "", nil)
+	if !strings.Contains(response.Body.String(), "&lt;script&gt;x&lt;/script&gt;") || strings.Contains(response.Body.String(), "<script>x</script>") {
+		t.Fatalf("telemetry was not escaped: %q", response.Body.String())
+	}
+}
+
 func TestIngestBearerAuth(t *testing.T) {
 	handler, _ := newTestHandler(t, "secret")
 	jsonBody, _ := traceFixture(t)

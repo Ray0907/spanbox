@@ -1,0 +1,52 @@
+{{define "content"}}
+<section class="page-heading">
+  <div>
+    <h1>Traces</h1>
+    <p>Requests, model calls, tools, and their full telemetry.</p>
+  </div>
+  <span class="result-count">{{len .Rows}} shown</span>
+</section>
+{{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
+<form class="filters" method="get" action="/" hx-get="/?partial=1" hx-target="#trace-rows" hx-swap="outerHTML" hx-trigger="change, submit">
+  <label>Range
+    <select name="range">
+      <option value="" {{if eq .Filter.Range ""}}selected{{end}}>All retained</option>
+      <option value="15m" {{if eq .Filter.Range "15m"}}selected{{end}}>15 minutes</option>
+      <option value="1h" {{if eq .Filter.Range "1h"}}selected{{end}}>1 hour</option>
+      <option value="24h" {{if eq .Filter.Range "24h"}}selected{{end}}>24 hours</option>
+      <option value="7d" {{if eq .Filter.Range "7d"}}selected{{end}}>7 days</option>
+      <option value="custom" {{if eq .Filter.Range "custom"}}selected{{end}}>Custom</option>
+    </select>
+  </label>
+  <label>From
+    <input name="from" type="text" value="{{.Filter.From}}" placeholder="2026-09-15T00:00:00Z">
+  </label>
+  <label>To
+    <input name="to" type="text" value="{{.Filter.To}}" placeholder="2026-09-16T00:00:00Z">
+  </label>
+  <label>Model
+    <input name="model" value="{{.Filter.Model}}" placeholder="gpt-4o">
+  </label>
+  <label>Service
+    <input name="service" value="{{.Filter.Service}}" placeholder="api">
+  </label>
+  <label>Min duration (ms)
+    <input name="min_duration" type="number" min="0" step="1" value="{{.Filter.MinDuration}}">
+  </label>
+  <label>Session
+    <input name="session" value="{{.Filter.Session}}">
+  </label>
+  <label>User
+    <input name="user" value="{{.Filter.User}}">
+  </label>
+  <label class="check"><input name="errors" type="checkbox" value="1" {{if .Filter.Errors}}checked{{end}}> Errors only</label>
+  <button type="submit">Apply</button>
+</form>
+<div class="table-wrap">
+  <table class="trace-table">
+    <thead><tr><th>Time</th><th>Name</th><th>Service</th><th>Models</th><th>Spans</th><th>Tokens in / out</th><th>Cost</th><th>Duration</th><th>Status</th></tr></thead>
+    {{template "rows" .}}
+  </table>
+</div>
+{{if .NextURL}}<nav class="pagination" aria-label="Pagination"><a class="button secondary" href="{{.NextURL}}">Next page</a></nav>{{end}}
+{{end}}

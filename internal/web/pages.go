@@ -1,0 +1,343 @@
+package web
+
+import (
+	"bytes"
+	"database/sql"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"math"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Ray0907/spanbox/internal/store"
+)
+
+//go:embed templates/*.html static/*
+var webFiles embed.FS
+
+type layoutData struct {
+	Title      string
+	SQLEnabled bool
+	Version    string
+}
+
+type traceFilterView struct {
+	Range, From, To, Model, Service, MinDuration, Session, User string
+	Errors                                                      bool
+}
+
+type tracesPage struct {
+	layoutData
+	Rows    []store.TraceRow
+	Filter  traceFilterView
+	NextURL string
+	Error   string
+}
+
+func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet || r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	filter, view, err := traceFilter(r)
+	page := tracesPage{layoutData: layoutData{Title: "Traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view}
+	if err == nil {
+		page.Rows, err = deps.Store.ListTraces(r.Context(), filter)
+		if len(page.Rows) > 50 {
+			last := page.Rows[49]
+			page.Rows = page.Rows[:50]
+			query := cloneValues(r.URL.Query())
+			query.Del("partial")
+			query.Set("cursor", strconv.FormatInt(last.StartNs, 10)+":"+last.TraceID)
+			page.NextURL = "/?" + query.Encode()
+		}
+	}
+	if err != nil {
+		page.Error = err.Error()
+	}
+	if r.URL.Query().Get("partial") == "1" {
+		deps.render(w, "rows", page, "templates/traces_rows.html")
+		return
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/traces.html", "templates/traces_rows.html")
+}
+
+func traceFilter(r *http.Request) (store.TraceFilter, traceFilterView, error) {
+	query := r.URL.Query()
+	view := traceFilterView{
+		Range: query.Get("range"), From: query.Get("from"), To: query.Get("to"), Model: query.Get("model"),
+		Service: query.Get("service"), MinDuration: query.Get("min_duration"), Session: query.Get("session"),
+		User: query.Get("user"), Errors: query.Get("errors") == "1",
+	}
+	from, to, err := parseRange(view.Range, view.From, view.To)
+	if err != nil {
+		return store.TraceFilter{}, view, err
+	}
+	filter := store.TraceFilter{
+		FromNs: from, ToNs: to, Model: view.Model, Service: view.Service, ErrorsOnly: view.Errors,
+		SessionID: view.Session, UserID: view.User, Limit: 51,
+	}
+	if view.MinDuration != "" {
+		filter.MinDurationMs, err = strconv.ParseFloat(view.MinDuration, 64)
+		if err != nil || filter.MinDurationMs < 0 {
+			return store.TraceFilter{}, view, fmt.Errorf("minimum duration must be a non-negative number")
+		}
+	}
+	if cursor := query.Get("cursor"); cursor != "" {
+		start, traceID, ok := strings.Cut(cursor, ":")
+		if !ok || len(traceID) != 32 {
+			return store.TraceFilter{}, view, fmt.Errorf("invalid cursor")
+		}
+		filter.CursorStartNs, err = strconv.ParseInt(start, 10, 64)
+		if err != nil {
+			return store.TraceFilter{}, view, fmt.Errorf("invalid cursor")
+		}
+		filter.CursorTraceID = traceID
+	}
+	return filter, view, nil
+}
+
+func parseRange(value, fromText, toText string) (int64, int64, error) {
+	now := time.Now().UTC()
+	switch value {
+	case "":
+		return 0, 0, nil
+	case "15m":
+		return now.Add(-15 * time.Minute).UnixNano(), now.UnixNano(), nil
+	case "1h":
+		return now.Add(-time.Hour).UnixNano(), now.UnixNano(), nil
+	case "24h":
+		return now.Add(-24 * time.Hour).UnixNano(), now.UnixNano(), nil
+	case "7d":
+		return now.Add(-7 * 24 * time.Hour).UnixNano(), now.UnixNano(), nil
+	case "custom":
+		from, err := time.Parse(time.RFC3339, fromText)
+		if err != nil {
+			return 0, 0, fmt.Errorf("from must be RFC3339")
+		}
+		to, err := time.Parse(time.RFC3339, toText)
+		if err != nil || !to.After(from) {
+			return 0, 0, fmt.Errorf("to must be RFC3339 and after from")
+		}
+		return from.UnixNano(), to.UnixNano(), nil
+	default:
+		return 0, 0, fmt.Errorf("invalid range")
+	}
+}
+
+func cloneValues(values url.Values) url.Values {
+	copy := make(url.Values, len(values))
+	for key, value := range values {
+		copy[key] = append([]string(nil), value...)
+	}
+	return copy
+}
+
+type spanNode struct {
+	Span     store.Span
+	Width    int
+	Children []*spanNode
+}
+
+type tracePage struct {
+	layoutData
+	Trace    store.TraceRow
+	Roots    []*spanNode
+	Selected *spanView
+}
+
+func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	traceID := strings.TrimPrefix(r.URL.Path, "/traces/")
+	if len(traceID) != 32 || strings.Contains(traceID, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	trace, spans, err := deps.Store.GetTrace(r.Context(), traceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	roots := buildTree(spans)
+	page := tracePage{layoutData: layoutData{Title: trace.Name, SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Trace: trace, Roots: roots}
+	if len(spans) > 0 {
+		selected := newSpanView(spans[0])
+		page.Selected = &selected
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/trace.html", "templates/span.html")
+}
+
+func buildTree(spans []store.Span) []*spanNode {
+	nodes := make(map[string]*spanNode, len(spans))
+	maxDuration := 0.0
+	for _, span := range spans {
+		nodes[span.SpanID] = &spanNode{Span: span}
+		maxDuration = max(maxDuration, span.DurationMs)
+	}
+	var roots []*spanNode
+	for _, span := range spans {
+		node := nodes[span.SpanID]
+		if maxDuration > 0 {
+			node.Width = int(math.Round(span.DurationMs / maxDuration * 100))
+		}
+		if parent := nodes[span.ParentSpanID]; span.ParentSpanID != "" && parent != nil {
+			parent.Children = append(parent.Children, node)
+		} else {
+			roots = append(roots, node)
+		}
+	}
+	return roots
+}
+
+func (deps Deps) span(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/spans/"), "/")
+	if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) != 16 {
+		http.NotFound(w, r)
+		return
+	}
+	span, err := deps.Store.GetSpan(r.Context(), parts[0], parts[1])
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	deps.render(w, "span", newSpanView(span), "templates/span.html")
+}
+
+type messageView struct {
+	Role, Content string
+}
+
+type contentView struct {
+	Label, Text string
+	Present     bool
+	Messages    []messageView
+}
+
+type spanView struct {
+	Span                                       store.Span
+	Status                                     string
+	Input, Output                              contentView
+	Attributes, Events, Links, Resource, Scope string
+}
+
+func newSpanView(span store.Span) spanView {
+	status := map[int32]string{0: "Unset", 1: "OK", 2: "Error"}[span.StatusCode]
+	return spanView{
+		Span: span, Status: status, Input: formatContent("Input", span.InputContent), Output: formatContent("Output", span.OutputContent),
+		Attributes: prettyJSON(span.Attributes), Events: prettyJSON(span.Events), Links: prettyJSON(span.Links),
+		Resource: prettyJSON(span.Resource), Scope: prettyJSON(span.Scope),
+	}
+}
+
+func formatContent(label, raw string) contentView {
+	view := contentView{Label: label, Text: raw, Present: raw != ""}
+	if raw == "" {
+		return view
+	}
+	var value any
+	if json.Unmarshal([]byte(raw), &value) == nil {
+		view.Text = prettyJSON(raw)
+		view.Messages = messages(value)
+	}
+	return view
+}
+
+func messages(value any) []messageView {
+	if object, ok := value.(map[string]any); ok {
+		value = object["messages"]
+		if text, ok := value.(string); ok {
+			_ = json.Unmarshal([]byte(text), &value)
+		}
+	}
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]messageView, 0, len(items))
+	for _, item := range items {
+		object, ok := item.(map[string]any)
+		if !ok {
+			return nil
+		}
+		role, _ := object["role"].(string)
+		content, exists := object["content"]
+		if !exists {
+			content = object["parts"]
+		}
+		if role == "" {
+			role = "message"
+		}
+		result = append(result, messageView{Role: role, Content: textValue(content)})
+	}
+	return result
+}
+
+func textValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	body, _ := json.MarshalIndent(value, "", "  ")
+	return string(body)
+}
+
+func prettyJSON(value string) string {
+	var output bytes.Buffer
+	if json.Indent(&output, []byte(value), "", "  ") == nil {
+		return output.String()
+	}
+	return value
+}
+
+func (deps Deps) render(w http.ResponseWriter, name string, data any, files ...string) {
+	tmpl, err := template.New("page").Funcs(template.FuncMap{
+		"timeUTC": func(ns int64) string { return time.Unix(0, ns).UTC().Format(time.RFC3339Nano) },
+		"tokens": func(value *int64) string {
+			if value == nil {
+				return "—"
+			}
+			return strconv.FormatInt(*value, 10)
+		},
+		"money": func(value *float64) string {
+			if value == nil {
+				return "—"
+			}
+			return fmt.Sprintf("$%.6f", *value)
+		},
+		"duration": func(ms float64) string { return fmt.Sprintf("%.1f ms", ms) },
+		"spanModel": func(span store.Span) string {
+			if span.ResponseModel != "" {
+				return span.ResponseModel
+			}
+			return span.RequestModel
+		},
+	}).ParseFS(webFiles, files...)
+	if err != nil {
+		deps.Logf("parse templates: %v", err)
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
+		deps.Logf("render template %s: %v", name, err)
+	}
+}

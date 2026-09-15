@@ -1,0 +1,20 @@
+{{define "span"}}<article class="span-detail">
+  <header><div><span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span><h2>{{.Span.Name}}</h2></div><span class="mono">{{.Span.SpanID}}</span></header>
+  <dl class="metadata">
+    <div><dt>Model</dt><dd>{{if spanModel .Span}}{{spanModel .Span}}{{else}}—{{end}}</dd></div>
+    <div><dt>Provider</dt><dd>{{if .Span.Provider}}{{.Span.Provider}}{{else}}—{{end}}</dd></div>
+    <div><dt>Tokens</dt><dd>{{tokens .Span.InputTokens}} in / {{tokens .Span.OutputTokens}} out</dd></div>
+    <div><dt>Cost</dt><dd>{{money .Span.CostUSD}}</dd></div>
+    <div><dt>Duration</dt><dd>{{duration .Span.DurationMs}}</dd></div>
+    <div><dt>Status</dt><dd>{{.Status}}</dd></div>
+  </dl>
+  {{template "contentBlock" .Input}}
+  {{template "contentBlock" .Output}}
+  <details class="raw-block" open><summary>Attributes</summary><pre>{{.Attributes}}</pre></details>
+  <details class="raw-block"><summary>Events</summary><pre>{{.Events}}</pre></details>
+  <details class="raw-block"><summary>Links</summary><pre>{{.Links}}</pre></details>
+  <details class="raw-block"><summary>Resource</summary><pre>{{.Resource}}</pre></details>
+  <details class="raw-block"><summary>Scope</summary><pre>{{.Scope}}</pre></details>
+  {{if .Span.StatusMessage}}<details class="raw-block" open><summary>Status message</summary><pre>{{.Span.StatusMessage}}</pre></details>{{end}}
+</article>{{end}}
+{{define "contentBlock"}}{{if .Present}}<section class="content-block"><h3>{{.Label}}</h3>{{if .Messages}}{{range .Messages}}<section class="message"><strong>{{.Role}}</strong><pre>{{.Content}}</pre></section>{{end}}{{else}}<pre>{{.Text}}</pre>{{end}}</section>{{end}}{{end}}
