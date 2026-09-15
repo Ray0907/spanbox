@@ -204,6 +204,125 @@ func TestUpsertKeepsRowid(t *testing.T) {
 	}
 }
 
+func TestListTracesCursor(t *testing.T) {
+	store := openTestStore(t)
+	const start = int64(1_000_000_000)
+	for i := byte(1); i <= 5; i++ {
+		span := testSpan(traceID(i), spanID(i), start, start+1)
+		span.Name = "trace-" + string(rune('0'+i))
+		if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seen := map[string]bool{}
+	filter := TraceFilter{Limit: 2}
+	for {
+		rows, err := store.ListTraces(context.Background(), filter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if seen[row.TraceID] {
+				t.Fatalf("duplicate trace %s", row.TraceID)
+			}
+			seen[row.TraceID] = true
+		}
+		if len(rows) < filter.Limit {
+			break
+		}
+		last := rows[len(rows)-1]
+		filter.CursorStartNs, filter.CursorTraceID = last.StartNs, last.TraceID
+	}
+	if len(seen) != 5 {
+		t.Fatalf("saw %d traces, want 5", len(seen))
+	}
+}
+
+func TestListTracesFilters(t *testing.T) {
+	store := openTestStore(t)
+	spans := []Span{
+		testSpan(traceID(1), spanID(1), 1_000_000_000, 1_050_000_000),
+		testSpan(traceID(2), spanID(2), 2_000_000_000, 2_200_000_000),
+		testSpan(traceID(3), spanID(3), 3_000_000_000, 3_400_000_000),
+	}
+	for i := range spans {
+		spans[i].Kind = "llm"
+		spans[i].InputTokens, spans[i].OutputTokens, spans[i].CostUSD = i64(1), i64(1), f64(0.01)
+	}
+	spans[0].RequestModel = "small"
+	spans[1].RequestModel = "gpt-4o"
+	spans[2].RequestModel, spans[2].StatusCode = "gpt-4o-mini", 2
+	if err := store.InsertBatch(context.Background(), spans); err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name   string
+		filter TraceFilter
+		want   int
+	}{
+		{"errors", TraceFilter{ErrorsOnly: true}, 1},
+		{"model LIKE", TraceFilter{Model: "gpt-4o"}, 2},
+		{"minimum duration", TraceFilter{MinDurationMs: 300}, 1},
+	}
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			rows, err := store.ListTraces(context.Background(), check.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) != check.want {
+				t.Fatalf("got %d rows, want %d", len(rows), check.want)
+			}
+		})
+	}
+}
+
+func TestDashboardPercentiles(t *testing.T) {
+	store := openTestStore(t)
+	day1 := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
+	var spans []Span
+	for i := 1; i <= 10; i++ {
+		start := day1.Add(time.Duration(i) * time.Minute).UnixNano()
+		span := testSpan(traceID(byte(i)), spanID(byte(i)), start, start+int64(i)*int64(time.Millisecond))
+		span.Kind, span.RequestModel = "llm", "model-a"
+		span.InputTokens, span.OutputTokens, span.CostUSD = i64(1), i64(1), f64(0.01)
+		spans = append(spans, span)
+	}
+	for i := 1; i <= 3; i++ {
+		start := day1.Add(24*time.Hour + time.Duration(i)*time.Minute).UnixNano()
+		span := testSpan(traceID(byte(10+i)), spanID(byte(10+i)), start, start+int64(i)*int64(time.Millisecond))
+		span.Kind, span.RequestModel = "llm", "model-b"
+		span.InputTokens, span.OutputTokens, span.CostUSD = i64(1), i64(1), f64(0.01)
+		spans = append(spans, span)
+	}
+	if err := store.InsertBatch(context.Background(), spans); err != nil {
+		t.Fatal(err)
+	}
+	data, err := store.Dashboard(context.Background(), day1.UnixNano(), day1.Add(48*time.Hour).UnixNano())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Days) != 2 || data.DailyP50[0] == nil || *data.DailyP50[0] != 5 || data.DailyP95[0] == nil || *data.DailyP95[0] != 10 || data.DailyP50[1] == nil || *data.DailyP50[1] != 2 || data.DailyP95[1] == nil || *data.DailyP95[1] != 3 {
+		t.Fatalf("unexpected dashboard percentiles: days=%v p50=%v p95=%v", data.Days, data.DailyP50, data.DailyP95)
+	}
+}
+
+func TestSearchLiteral(t *testing.T) {
+	store := openTestStore(t)
+	span := testSpan(traceID(9), spanID(9), 1, 2)
+	span.Name, span.InputContent = "quoted trace", `he said "hi" OR bye`
+	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := store.Search(context.Background(), `"hi" OR`, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].TraceID != span.TraceID || hits[0].SpanID != span.SpanID {
+		t.Fatalf("unexpected hits: %+v", hits)
+	}
+}
+
 func TestPurge(t *testing.T) {
 	store := openTestStore(t)
 	now := time.Now().UTC()
