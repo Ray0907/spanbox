@@ -34,7 +34,7 @@
 | 語言 | Go，`CGO_ENABLED=0`，SQLite 用 `modernc.org/sqlite` v1.59+ |
 | 儲存 | SQLite 單檔，WAL，FTS5 全文，JSON 欄存 raw attributes |
 | UI | `html/template` + htmx，vendor 一支 uPlot，無 node toolchain，`embed.FS` 打包 |
-| Auth | 選填 `AUTH_TOKEN`；設了則 ingest 走 Bearer、UI 走 HMAC cookie login；沒設就全開並在啟動 log 警告 |
+| Auth | 選填 `AUTH_TOKEN`；設了則 ingest 走 Bearer、UI 走 HMAC cookie login；沒設就 ingest 與 UI 全開並在啟動 log 警告，但 `/sql` 停用（回 404 並說明需設 `AUTH_TOKEN`） |
 | 屬性相容 | 標準 `gen_ai.*` 為主，加一張 Go map normalize 表對映 OpenLLMetry / OpenInference / Langfuse v3 / Vercel AI SDK；raw attributes 全存 |
 | Span 分類 | ingest 時算 `kind` 欄：`llm` / `embedding` / `tool` / `retrieval` / `agent` / `other` |
 | 內容 | prompt / completion 全存不截斷，靠 retention 控體積 |
@@ -338,7 +338,7 @@ cost = uncached * input_cost_per_token
 | `GET /traces/{trace_id}` | 左：span tree（巢狀 `<details open>`，每列 kind badge、name、model、tokens、duration bar）。右：點 span 後 htmx 載 `GET /spans/{trace_id}/{span_id}`：input / output（JSON 可解析就 pretty print、messages 依 role 分段，全部 text context）、attributes、events、links、resource、scope、status |
 | `GET /dashboard` | 時間範圍同上。數字卡與每日 cost / tokens / error rate 從 `traces` 以 trace `start_ns` 分 UTC 日；error rate 分母是 trace 數。每日 p50 / p95 duration 從 `spans` 取 `kind='llm'`。per-model 表從 `spans` 取 `kind IN ('llm','embedding')`：calls / tokens / cost / avg duration。資料由 `GET /dashboard/data?range=` 回 JSON 給 uPlot |
 | `GET /search?q=` | literal phrase：把 `"` 加倍後包成 FTS5 quoted phrase 以 bind 參數傳給 `MATCH`。回 span 列表（trace name、span name、kind、model、`snippet()` 片段） |
-| `GET /sql`、`POST /sql` | 見 §11.2 |
+| `GET /sql`、`POST /sql` | 僅 `AUTH_TOKEN` 有值時存在，見 §11.2 |
 | `GET /healthz` | `ok` |
 
 ### 11.1 百分位
@@ -371,7 +371,9 @@ FROM r GROUP BY day;
 5. 結果上限：1000 列、64 欄、單 cell 64 KiB（超過截斷並標記）、總回應 4 MiB
 6. 頁面附 schema 說明與三個範例查詢
 
-已知上限：沒有 authorizer 意味著防線是 tokenizer 而非 engine；`/sql` 只給持有 `AUTH_TOKEN` 的操作者自己用，README 註明。
+7. `AUTH_TOKEN` 為空時 `/sql` 一律回 404，body 說明「set AUTH_TOKEN to enable」；頂欄不顯示 SQL 連結
+
+已知上限：沒有 authorizer 意味著防線是 tokenizer 而非 engine，單一 expression 仍可能在產生第一列前於 SQLite 內配置大量記憶體，只靠 5s interrupt 兜底；因此 `/sql` 只在有 `AUTH_TOKEN` 時存在、只給持有 token 的操作者用，README 註明。
 
 ## 12. Retention
 
@@ -404,7 +406,7 @@ FTS 由 delete trigger 同步。不會留下跨 cutoff 的殘缺 trace。
 - `normalize`：§7.3 清單
 - `pricing`：§8 清單
 - `store`：暫存目錄真 SQLite。InsertBatch 後 traces 每欄符合 §5.2 規則（含 NULL 傳染）；同 span 重送兩次只有一筆且內容更新、`id` 不變、FTS 查得到新內容查不到舊內容；retention 刪整個 trace；open sequence 在新 DB 與既有 DB 上都成功
-- `web` e2e：`httptest` 起完整 server，POST 一份三 span trace（protobuf 與 JSON 各一次），GET `/`、`/traces/{id}`、`/spans/{t}/{s}`、`/dashboard/data`、`/search?q=`、POST `/sql` 斷言關鍵字；`/sql` 拒絕 `ATTACH`、`PRAGMA`、多 statement，長 recursive CTE 5s 內中止；開 `AUTH_TOKEN` 再跑：無 token 401、錯 token 401、login 成功後 cookie 可用、cookie 不含原 token；回應帶 CSP 與 nosniff
+- `web` e2e：`httptest` 起完整 server，POST 一份三 span trace（protobuf 與 JSON 各一次），GET `/`、`/traces/{id}`、`/spans/{t}/{s}`、`/dashboard/data`、`/search?q=`、POST `/sql` 斷言關鍵字；無 `AUTH_TOKEN` 時 `/sql` 回 404；開 `AUTH_TOKEN` 再跑：`/sql` 可用且拒絕 `ATTACH`、`PRAGMA`、多 statement，長 recursive CTE 5s 內中止：無 token 401、錯 token 401、login 成功後 cookie 可用、cookie 不含原 token；回應帶 CSP 與 nosniff
 - 不做 UI 截圖測試
 
 ## 15. 打包
