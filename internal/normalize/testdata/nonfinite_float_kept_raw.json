@@ -1,0 +1,22 @@
+{
+  "attrs": {
+    "double.attribute": "NaN"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "attributes_contains": "\"double.attribute\":\"NaN\"",
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "other",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

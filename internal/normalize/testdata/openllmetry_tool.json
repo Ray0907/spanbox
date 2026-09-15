@@ -1,0 +1,30 @@
+{
+  "attrs": {
+    "traceloop.entity.input": {
+      "x": 1
+    },
+    "traceloop.entity.name": "calculator",
+    "traceloop.entity.output": {
+      "y": 2
+    },
+    "traceloop.span.kind": "tool"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "\"x\":1",
+    "kind": "tool",
+    "output_content_contains": "\"y\":2",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "calculator",
+    "user_id": ""
+  }
+}

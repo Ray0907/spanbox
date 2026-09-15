@@ -1,0 +1,26 @@
+{
+  "attrs": {
+    "gen_ai.operation.name": "embeddings",
+    "gen_ai.request.model": "text-embedding-3-small",
+    "gen_ai.usage.input_tokens": 12,
+    "gen_ai.usage.output_tokens": 0
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_tokens": 12,
+    "kind": "embedding",
+    "output_tokens": 0,
+    "provider": "",
+    "request_model": "text-embedding-3-small",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

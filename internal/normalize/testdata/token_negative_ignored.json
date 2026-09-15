@@ -1,0 +1,23 @@
+{
+  "attrs": {
+    "gen_ai.operation.name": "chat",
+    "gen_ai.usage.input_tokens": -1,
+    "gen_ai.usage.output_tokens": -2
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "llm",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

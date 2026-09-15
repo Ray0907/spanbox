@@ -1,0 +1,31 @@
+{
+  "attrs": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.call.arguments": {
+      "city": "Taipei"
+    },
+    "gen_ai.tool.call.id": "call-1",
+    "gen_ai.tool.call.result": {
+      "temp": 30
+    },
+    "gen_ai.tool.name": "weather"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "Taipei",
+    "kind": "tool",
+    "output_content_contains": "30",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "call-1",
+    "tool_name": "weather",
+    "user_id": ""
+  }
+}

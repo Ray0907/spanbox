@@ -1,0 +1,22 @@
+{
+  "attrs": {
+    "gen_ai.operation.name": "rerank",
+    "gen_ai.request.model": "rerank-v1"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "retrieval",
+    "provider": "",
+    "request_model": "rerank-v1",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

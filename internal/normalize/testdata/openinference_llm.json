@@ -1,0 +1,32 @@
+{
+  "attrs": {
+    "llm.cost.total": 0.002,
+    "llm.input_messages.0.message.contents.0.message_content.text": "hello",
+    "llm.model_name": "claude",
+    "llm.output_messages.0.message.tool_calls.0.tool_call.function.name": "weather",
+    "llm.token_count.completion": 4,
+    "llm.token_count.prompt": 11,
+    "openinference.span.kind": "LLM"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "explicit",
+    "cost_usd": 0.002,
+    "finish_reason": "",
+    "input_content_contains": "message_content",
+    "input_tokens": 11,
+    "kind": "llm",
+    "output_content_contains": "weather",
+    "output_tokens": 4,
+    "provider": "",
+    "request_model": "claude",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

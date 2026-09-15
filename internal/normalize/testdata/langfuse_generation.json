@@ -1,0 +1,36 @@
+{
+  "attrs": {
+    "langfuse.observation.cost_details": "{\"total\":0.0012}",
+    "langfuse.observation.input": {
+      "prompt": "hello"
+    },
+    "langfuse.observation.model.name": "gpt-4o",
+    "langfuse.observation.output": {
+      "answer": "hi"
+    },
+    "langfuse.observation.type": "generation",
+    "langfuse.observation.usage_details": "{\"input\":90,\"input_cached_tokens\":10,\"output\":20}"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cache_read_tokens": 10,
+    "cost_source": "explicit",
+    "cost_usd": 0.0012,
+    "finish_reason": "",
+    "input_content_contains": "prompt",
+    "input_tokens": 100,
+    "kind": "llm",
+    "output_content_contains": "answer",
+    "output_tokens": 20,
+    "provider": "",
+    "request_model": "gpt-4o",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

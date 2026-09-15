@@ -1,0 +1,22 @@
+{
+  "attrs": {
+    "bytes.attribute": "AAEC"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "attributes_contains": "\"bytes.attribute\":\"AAEC\"",
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "other",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

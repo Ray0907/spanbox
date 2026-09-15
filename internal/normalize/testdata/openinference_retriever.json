@@ -1,0 +1,29 @@
+{
+  "attrs": {
+    "input.value": "query",
+    "openinference.span.kind": "RETRIEVER",
+    "output.value": [
+      {
+        "document": "answer"
+      }
+    ]
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "query",
+    "kind": "retrieval",
+    "output_content_contains": "document",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

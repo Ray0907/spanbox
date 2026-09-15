@@ -1,0 +1,23 @@
+{
+  "attrs": {
+    "langfuse.observation.type": "tool",
+    "tool.id": "tool-2",
+    "tool.name": "search"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "tool",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "tool-2",
+    "tool_name": "search",
+    "user_id": ""
+  }
+}

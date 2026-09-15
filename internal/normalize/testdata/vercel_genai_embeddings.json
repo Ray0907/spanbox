@@ -1,0 +1,24 @@
+{
+  "attrs": {
+    "ai.usage.tokens": 7,
+    "embedding.model_name": "embed-v1",
+    "gen_ai.operation.name": "embeddings"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_tokens": 7,
+    "kind": "embedding",
+    "provider": "",
+    "request_model": "embed-v1",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

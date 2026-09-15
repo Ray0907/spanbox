@@ -1,0 +1,23 @@
+{
+  "attrs": {
+    "ai.model.id": "gpt-4o",
+    "ai.model.provider": "openai",
+    "gen_ai.operation.name": "invoke_agent"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "kind": "agent",
+    "provider": "openai",
+    "request_model": "gpt-4o",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

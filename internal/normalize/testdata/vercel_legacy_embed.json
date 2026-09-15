@@ -1,0 +1,31 @@
+{
+  "attrs": {
+    "ai.embedding": [
+      0.1,
+      0.2
+    ],
+    "ai.operationId": "ai.embed.doEmbed",
+    "ai.usage.tokens": 14,
+    "ai.value": "text",
+    "embedding.model_name": "embed"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "text",
+    "input_tokens": 14,
+    "kind": "embedding",
+    "output_content_contains": "0.1",
+    "provider": "",
+    "request_model": "embed",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

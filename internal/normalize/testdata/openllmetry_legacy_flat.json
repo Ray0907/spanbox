@@ -1,0 +1,30 @@
+{
+  "attrs": {
+    "gen_ai.completion.0.content": "legacy answer",
+    "gen_ai.prompt.0.content": "legacy prompt",
+    "gen_ai.prompt.0.role": "user",
+    "gen_ai.usage.completion_tokens": 3,
+    "gen_ai.usage.prompt_tokens": 9,
+    "llm.request.type": "chat"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "legacy prompt",
+    "input_tokens": 9,
+    "kind": "llm",
+    "output_content_contains": "legacy answer",
+    "output_tokens": 3,
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

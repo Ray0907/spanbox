@@ -1,0 +1,37 @@
+{
+  "attrs": {
+    "ai.model.id": "gpt-4o",
+    "ai.model.provider": "openai",
+    "ai.operationId": "ai.generateText.doGenerate",
+    "ai.prompt.messages": [
+      {
+        "content": "hello",
+        "role": "user"
+      }
+    ],
+    "ai.response.finishReason": "stop",
+    "ai.response.text": "world",
+    "ai.usage.completionTokens": 6,
+    "ai.usage.promptTokens": 13
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "stop",
+    "input_content_contains": "hello",
+    "input_tokens": 13,
+    "kind": "llm",
+    "output_content_contains": "world",
+    "output_tokens": 6,
+    "provider": "openai",
+    "request_model": "gpt-4o",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "attrs": {
+    "llm.choices.0.completion.text": "completed",
+    "llm.prompts.0.prompt.text": "complete me",
+    "openinference.span.kind": "LLM"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "complete me",
+    "kind": "llm",
+    "output_content_contains": "completed",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": ""
+  }
+}

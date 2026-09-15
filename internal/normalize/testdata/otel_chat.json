@@ -1,0 +1,49 @@
+{
+  "attrs": {
+    "gen_ai.conversation.id": "session-1",
+    "gen_ai.input.messages": [
+      {
+        "content": "hello",
+        "role": "user"
+      }
+    ],
+    "gen_ai.operation.name": "chat",
+    "gen_ai.output.messages": [
+      {
+        "content": "hi",
+        "role": "assistant"
+      }
+    ],
+    "gen_ai.provider.name": "openai",
+    "gen_ai.request.model": "gpt-4o",
+    "gen_ai.response.finish_reasons": [
+      "stop",
+      "length"
+    ],
+    "gen_ai.response.model": "gpt-4o-2024",
+    "gen_ai.system_instructions": "be concise",
+    "gen_ai.usage.input_tokens": 100,
+    "gen_ai.usage.output_tokens": 20,
+    "user.id": "user-1"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "stop,length",
+    "input_content_contains": "\"system_instructions\":\"be concise\"",
+    "input_tokens": 100,
+    "kind": "llm",
+    "output_content_contains": "\"role\":\"assistant\"",
+    "output_tokens": 20,
+    "provider": "openai",
+    "request_model": "gpt-4o",
+    "response_model": "gpt-4o-2024",
+    "service_name": "demo",
+    "session_id": "session-1",
+    "tool_call_id": "",
+    "tool_name": "",
+    "user_id": "user-1"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "attrs": {
+    "ai.toolCall.args": {
+      "q": "x"
+    },
+    "ai.toolCall.id": "c3",
+    "ai.toolCall.name": "search",
+    "ai.toolCall.result": "y",
+    "gen_ai.operation.name": "execute_tool"
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "\"q\":\"x\"",
+    "kind": "tool",
+    "output_content_contains": "y",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "c3",
+    "tool_name": "search",
+    "user_id": ""
+  }
+}

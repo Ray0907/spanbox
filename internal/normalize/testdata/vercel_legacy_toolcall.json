@@ -1,0 +1,31 @@
+{
+  "attrs": {
+    "ai.operationId": "ai.toolCall",
+    "ai.toolCall.args": {
+      "id": 1
+    },
+    "ai.toolCall.id": "call-4",
+    "ai.toolCall.name": "lookup",
+    "ai.toolCall.result": {
+      "ok": true
+    }
+  },
+  "resource": {
+    "service.name": "demo"
+  },
+  "want": {
+    "cost_source": "",
+    "finish_reason": "",
+    "input_content_contains": "\"id\":1",
+    "kind": "tool",
+    "output_content_contains": "\"ok\":true",
+    "provider": "",
+    "request_model": "",
+    "response_model": "",
+    "service_name": "demo",
+    "session_id": "",
+    "tool_call_id": "call-4",
+    "tool_name": "lookup",
+    "user_id": ""
+  }
+}
