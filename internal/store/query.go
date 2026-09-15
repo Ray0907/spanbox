@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"math"
 	"strings"
 )
 
@@ -110,14 +112,14 @@ func (s *Store) GetTrace(ctx context.Context, traceID string) (TraceRow, []Span,
 	if err != nil {
 		return TraceRow{}, nil, err
 	}
-	rows, err := s.r.QueryContext(ctx, spanSelect+" WHERE trace_id=? ORDER BY start_ns, span_id", traceID)
+	rows, err := s.r.QueryContext(ctx, spanTreeSelect+" WHERE trace_id=? ORDER BY start_ns, span_id", traceID)
 	if err != nil {
 		return TraceRow{}, nil, err
 	}
 	defer rows.Close()
 	var spans []Span
 	for rows.Next() {
-		span, err := scanSpan(rows)
+		span, err := scanTreeSpan(rows)
 		if err != nil {
 			return TraceRow{}, nil, err
 		}
@@ -131,6 +133,16 @@ func (s *Store) GetTrace(ctx context.Context, traceID string) (TraceRow, []Span,
 
 func (s *Store) GetSpan(ctx context.Context, traceID, spanID string) (Span, error) {
 	return scanSpan(s.r.QueryRowContext(ctx, spanSelect+" WHERE trace_id=? AND span_id=?", traceID, spanID))
+}
+
+const spanTreeSelect = `SELECT trace_id, span_id, parent_span_id, name, kind, duration_ms,
+	request_model, response_model, input_tokens, output_tokens FROM spans`
+
+func scanTreeSpan(row scanner) (Span, error) {
+	var span Span
+	err := row.Scan(&span.TraceID, &span.SpanID, &span.ParentSpanID, &span.Name, &span.Kind, &span.DurationMs,
+		&span.RequestModel, &span.ResponseModel, &span.InputTokens, &span.OutputTokens)
+	return span, err
 }
 
 const spanSelect = `SELECT trace_id, span_id, parent_span_id, name, kind, service_name, start_ns, end_ns,
@@ -239,8 +251,48 @@ func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardDat
 		}
 		data.Models = append(data.Models, model)
 	}
-	return data, modelRows.Err()
+	if err := modelRows.Err(); err != nil {
+		return DashboardData{}, err
+	}
+	if err := validateDashboardCosts(data); err != nil {
+		return DashboardData{}, err
+	}
+	return data, nil
 }
+
+func validateDashboardCosts(data DashboardData) error {
+	costs := []*float64{data.TotalCost}
+	costs = append(costs, data.DailyCost...)
+	for _, model := range data.Models {
+		costs = append(costs, model.Cost)
+		if !finite(model.AvgMs) {
+			return fmt.Errorf("non-finite dashboard duration")
+		}
+	}
+	for _, cost := range costs {
+		if cost != nil && !costInRange(*cost) {
+			return fmt.Errorf("%w: dashboard aggregate", ErrCostOutOfRange)
+		}
+	}
+	if !finite(data.ErrorRate) {
+		return fmt.Errorf("non-finite dashboard error rate")
+	}
+	for _, value := range data.DailyErrorRate {
+		if !finite(value) {
+			return fmt.Errorf("non-finite dashboard aggregate")
+		}
+	}
+	for _, values := range [][]*float64{data.DailyP50, data.DailyP95} {
+		for _, value := range values {
+			if value != nil && !finite(*value) {
+				return fmt.Errorf("non-finite dashboard duration")
+			}
+		}
+	}
+	return nil
+}
+
+func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
 func (s *Store) dashboardPercentiles(ctx context.Context, fromNs, toNs int64) (map[string][2]sql.NullFloat64, error) {
 	rows, err := s.r.QueryContext(ctx, `WITH r AS (

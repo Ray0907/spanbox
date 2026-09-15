@@ -68,7 +68,11 @@ func runRetention(database *store.Store, days int) {
 		cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour).UnixNano()
 		deleted, err := database.Purge(context.Background(), cutoff)
 		if err != nil {
-			log.Printf("retention: %v", err)
+			if deleted > 0 {
+				log.Printf("retention: deleted %d traces; cleanup failed: %v", deleted, err)
+			} else {
+				log.Printf("retention: %v", err)
+			}
 		} else if deleted > 0 {
 			log.Printf("retention: deleted %d traces", deleted)
 		}

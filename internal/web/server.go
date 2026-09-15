@@ -16,16 +16,20 @@ import (
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 type Deps struct {
-	Cfg     config.Config
-	Store   *store.Store
-	Pricing *pricing.Table
-	Version string
-	Logf    func(string, ...any)
+	Cfg         config.Config
+	Store       *store.Store
+	Pricing     *pricing.Table
+	Version     string
+	Logf        func(string, ...any)
+	ingestSlots chan struct{}
 }
 
 func NewHandler(deps Deps) http.Handler {
 	if deps.Logf == nil {
 		deps.Logf = log.Printf
+	}
+	if deps.ingestSlots == nil {
+		deps.ingestSlots = make(chan struct{}, config.MaxConcurrentIngest)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +40,7 @@ func NewHandler(deps Deps) http.Handler {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		fmt.Fprintln(w, "ok")
 	})
-	mux.HandleFunc("/v1/traces", deps.ingest)
+	mux.HandleFunc("/v1/traces", deps.limitIngest)
 	mux.HandleFunc("/login", deps.login)
 	staticFiles, err := fs.Sub(webFiles, "static")
 	if err != nil {
@@ -59,6 +63,7 @@ func NewServer(deps Deps) *http.Server {
 		Handler:           NewHandler(deps),
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 		ReadTimeout:       config.ReadTimeout,
+		WriteTimeout:      config.WriteTimeout,
 		IdleTimeout:       config.IdleTimeout,
 		MaxHeaderBytes:    config.MaxHeaderBytes,
 	}

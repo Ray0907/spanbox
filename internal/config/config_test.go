@@ -30,6 +30,22 @@ func TestFromEnvParsesAllValues(t *testing.T) {
 	}
 }
 
+func TestFromEnvRejectsInvalidRetention(t *testing.T) {
+	for _, value := range []string{"-1", "106752"} {
+		t.Run(value, func(t *testing.T) {
+			_, err := FromEnv(func(key string) string {
+				if key == "RETENTION_DAYS" {
+					return value
+				}
+				return ""
+			})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
 func TestFromEnvRejectsNonInteger(t *testing.T) {
 	for _, key := range []string{"PORT", "RETENTION_DAYS"} {
 		t.Run(key, func(t *testing.T) {

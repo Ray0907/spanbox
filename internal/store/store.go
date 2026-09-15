@@ -3,6 +3,9 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"math"
+
+	"github.com/Ray0907/spanbox/internal/config"
 )
 
 type Span struct {
@@ -38,6 +41,12 @@ type Span struct {
 	Links           string
 	Resource        string
 	Scope           string
+}
+
+var ErrCostOutOfRange = errors.New("cost out of range")
+
+func costInRange(cost float64) bool {
+	return cost >= 0 && cost <= config.MaxCostUSD && !math.IsNaN(cost) && !math.IsInf(cost, 0)
 }
 
 type Store struct {

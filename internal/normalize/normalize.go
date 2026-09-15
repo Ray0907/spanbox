@@ -2,6 +2,7 @@ package normalize
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -16,14 +17,33 @@ type candidate struct {
 	value any
 }
 
-func Span(raw otlp.RawSpan, logf func(format string, args ...any)) store.Span {
+func Span(raw otlp.RawSpan, logf func(format string, args ...any)) (store.Span, error) {
+	attributes, err := jsonText(raw.Attrs)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("encode attributes: %w", err)
+	}
+	events, err := jsonText(raw.Events)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("encode events: %w", err)
+	}
+	links, err := jsonText(raw.Links)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("encode links: %w", err)
+	}
+	resource, err := jsonText(raw.Resource)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("encode resource: %w", err)
+	}
+	scope, err := jsonText(raw.Scope)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("encode scope: %w", err)
+	}
 	kind := detectKind(raw.Attrs, logf)
 	result := store.Span{
 		TraceID: raw.TraceID, SpanID: raw.SpanID, ParentSpanID: raw.ParentSpanID, Name: raw.Name, Kind: kind,
 		ServiceName: "unknown", StartNs: raw.StartNs, EndNs: raw.EndNs, DurationMs: float64(raw.EndNs-raw.StartNs) / 1e6,
 		StatusCode: raw.StatusCode, StatusMessage: raw.StatusMessage, TraceState: raw.TraceState,
-		Attributes: jsonText(raw.Attrs, "{}", logf), Events: jsonText(raw.Events, "[]", logf),
-		Links: jsonText(raw.Links, "[]", logf), Resource: jsonText(raw.Resource, "{}", logf), Scope: jsonText(raw.Scope, "{}", logf),
+		Attributes: attributes, Events: events, Links: links, Resource: resource, Scope: scope,
 	}
 	result.ServiceName = firstString(raw.Resource, logf, "service.name")
 	if result.ServiceName == "" {
@@ -51,12 +71,22 @@ func Span(raw otlp.RawSpan, logf func(format string, args ...any)) store.Span {
 		}
 	}
 
-	if cost, ok := explicitCost(raw.Attrs, logf); ok {
+	cost, ok, err := explicitCost(raw.Attrs, logf)
+	if err != nil {
+		return store.Span{}, err
+	}
+	if ok {
 		result.CostUSD = &cost
 		result.CostSource = "explicit"
 	}
-	result.InputContent = inputContent(raw.Attrs, logf)
-	result.OutputContent = outputContent(raw.Attrs, logf)
+	result.InputContent, err = inputContent(raw.Attrs, logf)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("normalize input content: %w", err)
+	}
+	result.OutputContent, err = outputContent(raw.Attrs, logf)
+	if err != nil {
+		return store.Span{}, fmt.Errorf("normalize output content: %w", err)
+	}
 	toolKeys := []string{"gen_ai.tool.name", "tool.name", "ai.toolCall.name"}
 	if kind == "tool" {
 		toolKeys = append(toolKeys, "traceloop.entity.name")
@@ -66,7 +96,7 @@ func Span(raw otlp.RawSpan, logf func(format string, args ...any)) store.Span {
 	result.FinishReason = finishReason(raw.Attrs, logf)
 	result.SessionID = firstString(raw.Attrs, logf, "gen_ai.conversation.id", "session.id", "langfuse.session.id", "traceloop.correlation.id")
 	result.UserID = firstString(raw.Attrs, logf, "user.id", "langfuse.user.id", "enduser.id", "gen_ai.user", "llm.user")
-	return result
+	return result, nil
 }
 
 func firstString(values map[string]any, logf func(string, ...any), keys ...string) string {
@@ -173,7 +203,7 @@ func summedTokens(values map[string]any, exact, prefix string, logf func(string,
 	return &total
 }
 
-func explicitCost(attrs map[string]any, logf func(string, ...any)) (float64, bool) {
+func explicitCost(attrs map[string]any, logf func(string, ...any)) (float64, bool, error) {
 	if value, exists := attrs["langfuse.observation.cost_details"]; exists {
 		var details map[string]any
 		switch value := value.(type) {
@@ -187,8 +217,11 @@ func explicitCost(attrs map[string]any, logf func(string, ...any)) (float64, boo
 			warn(logf, "langfuse.observation.cost_details must be JSON, got %T", value)
 		}
 		if details != nil {
-			if total, ok := costNumber(details["total"]); ok {
-				return total, true
+			if total, numeric := rawCostNumber(details["total"]); numeric {
+				if !costInRange(total) {
+					return 0, false, fmt.Errorf("%w: langfuse.observation.cost_details.total", store.ErrCostOutOfRange)
+				}
+				return total, true, nil
 			}
 			var total float64
 			found := false
@@ -196,51 +229,56 @@ func explicitCost(attrs map[string]any, logf func(string, ...any)) (float64, boo
 				if key == "total" {
 					continue
 				}
-				if amount, ok := costNumber(value); ok {
+				if amount, numeric := rawCostNumber(value); numeric {
+					if !costInRange(amount) {
+						return 0, false, fmt.Errorf("%w: langfuse.observation.cost_details.%s", store.ErrCostOutOfRange, key)
+					}
 					total += amount
 					found = true
 				}
 			}
 			if found {
-				return total, true
+				if !costInRange(total) {
+					return 0, false, fmt.Errorf("%w: langfuse.observation.cost_details", store.ErrCostOutOfRange)
+				}
+				return total, true, nil
 			}
 		}
 	}
 	if value, exists := attrs["llm.cost.total"]; exists {
-		if cost, ok := costNumber(value); ok {
-			return cost, true
+		if cost, numeric := rawCostNumber(value); numeric {
+			if !costInRange(cost) {
+				return 0, false, fmt.Errorf("%w: llm.cost.total", store.ErrCostOutOfRange)
+			}
+			return cost, true, nil
 		}
 		warn(logf, "llm.cost.total has invalid cost value %v", value)
 	}
-	return 0, false
+	return 0, false, nil
 }
 
-func costNumber(value any) (float64, bool) {
-	var result float64
+func rawCostNumber(value any) (float64, bool) {
 	switch value := value.(type) {
 	case float64:
-		result = value
+		return value, true
 	case int64:
-		result = float64(value)
+		return float64(value), true
 	case json.Number:
 		parsed, err := value.Float64()
-		if err != nil {
-			return 0, false
-		}
-		result = parsed
+		return parsed, err == nil
 	case string:
 		parsed, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return 0, false
-		}
-		result = parsed
+		return parsed, err == nil
 	default:
 		return 0, false
 	}
-	return result, result >= 0 && !math.IsNaN(result) && !math.IsInf(result, 0)
 }
 
-func inputContent(attrs map[string]any, logf func(string, ...any)) string {
+func costInRange(cost float64) bool {
+	return cost >= 0 && cost <= config.MaxCostUSD && !math.IsNaN(cost) && !math.IsInf(cost, 0)
+}
+
+func inputContent(attrs map[string]any, logf func(string, ...any)) (string, error) {
 	special := make(map[string]any, 2)
 	for key, name := range map[string]string{"gen_ai.system_instructions": "system_instructions", "gen_ai.input.messages": "messages"} {
 		if value, exists := attrs[key]; exists {
@@ -248,32 +286,40 @@ func inputContent(attrs map[string]any, logf func(string, ...any)) string {
 		}
 	}
 	if len(special) > 0 {
-		return jsonText(special, "", logf)
+		return jsonText(special)
 	}
-	if value := firstContent(attrs, logf, "langfuse.observation.input", "input.value", "traceloop.entity.input", "ai.prompt.messages", "ai.prompt", "ai.value", "ai.values", "gen_ai.prompt"); value != "" {
-		return value
+	if value, err := firstContent(attrs, logf, "langfuse.observation.input", "input.value", "traceloop.entity.input", "ai.prompt.messages", "ai.prompt", "ai.value", "ai.values", "gen_ai.prompt"); value != "" || err != nil {
+		return value, err
 	}
 	for _, prefix := range []string{"gen_ai.prompt", "llm.input_messages", "llm.prompts"} {
-		if value, ok := RebuildIndexed(attrs, prefix); ok {
-			return jsonText(value, "", logf)
+		value, ok, err := rebuildIndexed(attrs, prefix)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return jsonText(value)
 		}
 	}
 	return firstContent(attrs, logf, "ai.toolCall.args", "gen_ai.tool.call.arguments")
 }
 
-func outputContent(attrs map[string]any, logf func(string, ...any)) string {
-	if value := firstContent(attrs, logf, "gen_ai.output.messages", "langfuse.observation.output", "output.value", "traceloop.entity.output", "ai.response.text", "ai.response.toolCalls", "ai.response.object", "ai.embedding", "ai.embeddings", "gen_ai.completion"); value != "" {
-		return value
+func outputContent(attrs map[string]any, logf func(string, ...any)) (string, error) {
+	if value, err := firstContent(attrs, logf, "gen_ai.output.messages", "langfuse.observation.output", "output.value", "traceloop.entity.output", "ai.response.text", "ai.response.toolCalls", "ai.response.object", "ai.embedding", "ai.embeddings", "gen_ai.completion"); value != "" || err != nil {
+		return value, err
 	}
 	for _, prefix := range []string{"gen_ai.completion", "llm.output_messages", "llm.choices"} {
-		if value, ok := RebuildIndexed(attrs, prefix); ok {
-			return jsonText(value, "", logf)
+		value, ok, err := rebuildIndexed(attrs, prefix)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return jsonText(value)
 		}
 	}
 	return firstContent(attrs, logf, "ai.toolCall.result", "gen_ai.tool.call.result")
 }
 
-func firstContent(attrs map[string]any, logf func(string, ...any), keys ...string) string {
+func firstContent(attrs map[string]any, logf func(string, ...any), keys ...string) (string, error) {
 	for _, key := range keys {
 		value, exists := attrs[key]
 		if !exists {
@@ -282,15 +328,15 @@ func firstContent(attrs map[string]any, logf func(string, ...any), keys ...strin
 		switch value := value.(type) {
 		case string:
 			if value != "" {
-				return value
+				return value, nil
 			}
 		case []any, map[string]any:
-			return jsonText(value, "", logf)
+			return jsonText(value)
 		default:
 			warn(logf, "%s must be a string, array, or object, got %T", key, value)
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func finishReason(attrs map[string]any, logf func(string, ...any)) string {
@@ -315,13 +361,12 @@ func finishReason(attrs map[string]any, logf func(string, ...any)) string {
 	return firstString(attrs, logf, "gen_ai.response.finish_reason", "llm.finish_reason", "ai.response.finishReason")
 }
 
-func jsonText(value any, fallback string, logf func(string, ...any)) string {
+func jsonText(value any) (string, error) {
 	body, err := json.Marshal(value)
 	if err != nil {
-		warn(logf, "cannot encode JSON: %v", err)
-		return fallback
+		return "", err
 	}
-	return string(body)
+	return string(body), nil
 }
 
 func warn(logf func(string, ...any), format string, args ...any) {

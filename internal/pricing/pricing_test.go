@@ -36,6 +36,12 @@ func requireCost(t *testing.T, got float64, ok bool, want float64) {
 	}
 }
 
+func TestLoadRejectsTrailingData(t *testing.T) {
+	if _, err := loadFrom(strings.NewReader(testPrices + `{}`)); err == nil {
+		t.Fatal("expected trailing JSON to be rejected")
+	}
+}
+
 func TestCostLookup(t *testing.T) {
 	table := testTable(t)
 	tests := []struct {
@@ -76,6 +82,16 @@ func TestCostUnknownOrIncompleteModel(t *testing.T) {
 		if _, ok := testTable(t).Cost("", model, "", int64ptr(1), int64ptr(1), nil); ok {
 			t.Fatalf("expected %q not to resolve", model)
 		}
+	}
+}
+
+func TestCostRejectsNonFiniteOrExcessiveResult(t *testing.T) {
+	table, err := loadFrom(strings.NewReader(`{"huge":{"input_cost_per_token":1e308,"output_cost_per_token":1e308}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := table.Cost("", "huge", "", int64ptr(1_000_000_000_000), int64ptr(1), nil); ok {
+		t.Fatal("expected excessive cost not to resolve")
 	}
 }
 

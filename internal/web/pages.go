@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"math"
@@ -63,7 +64,7 @@ func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 		page.Error = err.Error()
 	}
 	if r.URL.Query().Get("partial") == "1" {
-		deps.render(w, "rows", page, "templates/traces_rows.html")
+		deps.render(w, "results", page, "templates/traces_rows.html")
 		return
 	}
 	deps.render(w, "base", page, "templates/base.html", "templates/traces.html", "templates/traces_rows.html")
@@ -86,7 +87,7 @@ func traceFilter(r *http.Request) (store.TraceFilter, traceFilterView, error) {
 	}
 	if view.MinDuration != "" {
 		filter.MinDurationMs, err = strconv.ParseFloat(view.MinDuration, 64)
-		if err != nil || filter.MinDurationMs < 0 {
+		if err != nil || filter.MinDurationMs < 0 || math.IsNaN(filter.MinDurationMs) || math.IsInf(filter.MinDurationMs, 0) {
 			return store.TraceFilter{}, view, fmt.Errorf("minimum duration must be a non-negative number")
 		}
 	}
@@ -175,7 +176,12 @@ func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 	roots := buildTree(spans)
 	page := tracePage{layoutData: layoutData{Title: trace.Name, SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Trace: trace, Roots: roots}
 	if len(spans) > 0 {
-		selected := newSpanView(spans[0])
+		selectedSpan, err := deps.Store.GetSpan(r.Context(), traceID, spans[0].SpanID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		selected := newSpanView(selectedSpan)
 		page.Selected = &selected
 	}
 	deps.render(w, "base", page, "templates/base.html", "templates/trace.html", "templates/span.html")
@@ -249,10 +255,14 @@ func (deps Deps) dashboardData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+	body, err := json.Marshal(data)
+	if err != nil {
 		deps.Logf("encode dashboard: %v", err)
+		http.Error(w, "encoding error", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(body)
 }
 
 type searchPage struct {
@@ -302,7 +312,13 @@ func (deps Deps) sqlPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := sqlPage{layoutData: layoutData{Title: "SQL", SQLEnabled: true, Version: deps.Version}}
-	page.Schema = deps.schema(r)
+	var err error
+	page.Schema, err = deps.schema(r)
+	if err != nil {
+		deps.Logf("inspect schema: %v", err)
+		http.Error(w, "database error", http.StatusInternalServerError)
+		return
+	}
 	status := http.StatusOK
 	if r.Method == http.MethodPost {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -331,26 +347,32 @@ func (deps Deps) sqlPage(w http.ResponseWriter, r *http.Request) {
 	deps.render(w, "base", page, "templates/base.html", "templates/sql.html")
 }
 
-func (deps Deps) schema(r *http.Request) []schemaTable {
+func (deps Deps) schema(r *http.Request) ([]schemaTable, error) {
 	var result []schemaTable
 	for _, table := range []string{"traces", "spans", "spans_fts"} {
 		rows, err := deps.Store.Reader().QueryContext(r.Context(), "PRAGMA table_info("+table+")")
 		if err != nil {
-			continue
+			return nil, err
 		}
 		entry := schemaTable{Name: table}
 		for rows.Next() {
 			var id, notNull, primaryKey int
 			var name, kind string
 			var defaultValue sql.NullString
-			if rows.Scan(&id, &name, &kind, &notNull, &defaultValue, &primaryKey) == nil {
-				entry.Columns = append(entry.Columns, name+" "+kind)
+			if err := rows.Scan(&id, &name, &kind, &notNull, &defaultValue, &primaryKey); err != nil {
+				return nil, errors.Join(err, rows.Close())
 			}
+			entry.Columns = append(entry.Columns, name+" "+kind)
 		}
-		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, errors.Join(err, rows.Close())
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
 		result = append(result, entry)
 	}
-	return result
+	return result, nil
 }
 
 func (deps Deps) span(w http.ResponseWriter, r *http.Request) {

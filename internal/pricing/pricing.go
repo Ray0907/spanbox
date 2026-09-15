@@ -3,9 +3,13 @@ package pricing
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
+
+	"github.com/Ray0907/spanbox/internal/config"
 )
 
 //go:embed model_prices.json
@@ -47,8 +51,16 @@ func Load(overridePath string) (*Table, error) {
 }
 
 func loadFrom(r io.Reader) (*Table, error) {
+	decoder := json.NewDecoder(r)
 	var all map[string]price
-	if err := json.NewDecoder(r).Decode(&all); err != nil {
+	if err := decoder.Decode(&all); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("unexpected trailing JSON value")
+		}
 		return nil, err
 	}
 	prices := make(map[string]price, len(all))
@@ -77,7 +89,11 @@ func (t *Table) Cost(provider, requestModel, responseModel string, input, output
 	if p.CacheRead != nil {
 		cachePrice = *p.CacheRead
 	}
-	return float64(uncached)**p.Input + float64(cached)*cachePrice + float64(*output)**p.Output, true
+	cost := float64(uncached)**p.Input + float64(cached)*cachePrice + float64(*output)**p.Output
+	if cost < 0 || cost > config.MaxCostUSD || math.IsNaN(cost) || math.IsInf(cost, 0) {
+		return 0, false
+	}
+	return cost, true
 }
 
 func (t *Table) lookup(provider, requestModel, responseModel string) (price, bool) {

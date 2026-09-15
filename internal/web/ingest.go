@@ -17,6 +17,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func (deps Deps) limitIngest(w http.ResponseWriter, r *http.Request) {
+	select {
+	case deps.ingestSlots <- struct{}{}:
+		defer func() { <-deps.ingestSlots }()
+		deps.ingest(w, r)
+	default:
+		w.Header().Set("Retry-After", "1")
+		writeStatus(w, responseMediaType(r), http.StatusServiceUnavailable, 14, "ingest capacity exhausted; retry later")
+	}
+}
+
 func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeStatus(w, responseMediaType(r), http.StatusMethodNotAllowed, 3, "POST required")
@@ -55,7 +66,16 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 	}
 	spans := make([]store.Span, 0, len(rawSpans))
 	for _, raw := range rawSpans {
-		span := normalize.Span(raw, deps.Logf)
+		span, err := normalize.Span(raw, deps.Logf)
+		if err != nil {
+			if errors.Is(err, normalize.ErrIndexedPath) || errors.Is(err, store.ErrCostOutOfRange) {
+				writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
+			} else {
+				deps.Logf("normalize span: %v", err)
+				writeStatus(w, mediaType, http.StatusInternalServerError, 13, "normalization error")
+			}
+			return
+		}
 		if (span.Kind == "llm" || span.Kind == "embedding") && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
 			if cost, ok := deps.Pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens); ok {
 				span.CostUSD = &cost
@@ -65,8 +85,12 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 		spans = append(spans, span)
 	}
 	if err := deps.Store.InsertBatch(r.Context(), spans); err != nil {
-		deps.Logf("insert trace batch: %v", err)
-		writeStatus(w, mediaType, http.StatusInternalServerError, 13, "database error")
+		if errors.Is(err, store.ErrCostOutOfRange) {
+			writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
+		} else {
+			deps.Logf("insert trace batch: %v", err)
+			writeStatus(w, mediaType, http.StatusInternalServerError, 13, "database error")
+		}
 		return
 	}
 	w.Header().Set("Content-Type", mediaType)

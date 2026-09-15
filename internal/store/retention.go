@@ -3,6 +3,13 @@ package store
 import "context"
 
 func (s *Store) Purge(ctx context.Context, cutoffNs int64) (int64, error) {
+	return s.purge(ctx, cutoffNs, func(ctx context.Context) error {
+		_, err := s.w.ExecContext(ctx, "PRAGMA incremental_vacuum(2000)")
+		return err
+	})
+}
+
+func (s *Store) purge(ctx context.Context, cutoffNs int64, vacuum func(context.Context) error) (int64, error) {
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -28,8 +35,5 @@ func (s *Store) Purge(ctx context.Context, cutoffNs int64) (int64, error) {
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
-	if _, err := s.w.ExecContext(ctx, "PRAGMA incremental_vacuum(2000)"); err != nil {
-		return 0, err
-	}
-	return deleted, nil
+	return deleted, vacuum(ctx)
 }

@@ -2,6 +2,7 @@ package normalize
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/Ray0907/spanbox/internal/otlp"
+	"github.com/Ray0907/spanbox/internal/store"
 )
 
 type fixtureWant struct {
@@ -65,7 +67,10 @@ func TestFixtures(t *testing.T) {
 				Events: []map[string]any{}, Links: []map[string]any{}, Resource: fixture.Resource,
 				Scope: map[string]any{"name": "test", "version": "1", "attributes": map[string]any{}},
 			}
-			got := Span(raw, t.Logf)
+			got, err := Span(raw, t.Logf)
+			if err != nil {
+				t.Fatal(err)
+			}
 			want := fixture.Want
 			if got.Kind != want.Kind || got.Provider != want.Provider || got.RequestModel != want.RequestModel || got.ResponseModel != want.ResponseModel || got.ServiceName != want.ServiceName || !reflect.DeepEqual(got.InputTokens, want.InputTokens) || !reflect.DeepEqual(got.OutputTokens, want.OutputTokens) || !reflect.DeepEqual(got.CacheReadTokens, want.CacheReadTokens) || got.CostSource != want.CostSource || got.ToolName != want.ToolName || got.ToolCallID != want.ToolCallID || got.FinishReason != want.FinishReason || got.SessionID != want.SessionID || got.UserID != want.UserID {
 				t.Fatalf("got %+v\nwant %+v", got, want)
@@ -101,6 +106,40 @@ func TestRebuildIndexed(t *testing.T) {
 	want := []any{map[string]any{"message": map[string]any{"contents": []any{nil, map[string]any{"message_content": map[string]any{"text": "hello"}}}}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestRebuildIndexedRejectsUnsafeIndices(t *testing.T) {
+	for _, key := range []string{"gen_ai.prompt.10001.content", "gen_ai.prompt.100000000.content"} {
+		t.Run(key, func(t *testing.T) {
+			if _, ok := RebuildIndexed(map[string]any{key: "x"}, "gen_ai.prompt"); ok {
+				t.Fatal("expected unsafe index to be rejected")
+			}
+		})
+	}
+}
+
+func TestSpanReturnsNormalizationErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		attrs map[string]any
+	}{
+		{"unsafe indexed path", map[string]any{"gen_ai.prompt.10001.content": "x"}},
+		{"unencodable raw attribute", map[string]any{"bad": func() {}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Span(otlp.RawSpan{Attrs: tt.attrs}, t.Logf)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestSpanRejectsExcessiveExplicitCost(t *testing.T) {
+	if _, err := Span(otlp.RawSpan{Attrs: map[string]any{"llm.cost.total": 1e308}}, t.Logf); !errors.Is(err, store.ErrCostOutOfRange) {
+		t.Fatalf("got %v, want ErrCostOutOfRange", err)
 	}
 }
 

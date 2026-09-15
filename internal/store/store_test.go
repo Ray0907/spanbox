@@ -3,9 +3,11 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -116,6 +118,34 @@ func TestInsertBatchRecompute(t *testing.T) {
 	if name != "root-agent" || service != "demo" || start != 100_000_000 || end != 500_000_000 || duration != 400 || spanCount != 3 || llmCount != 1 || input != 100 || output != 20 || math.Abs(cost-0.001) > 1e-12 || hasError != 0 || models != "gpt-4o" {
 		t.Fatalf("unexpected trace summary: name=%q service=%q start=%d end=%d duration=%g spans=%d llms=%d input=%d output=%d cost=%g error=%d models=%q", name, service, start, end, duration, spanCount, llmCount, input, output, cost, hasError, models)
 	}
+}
+
+func TestInsertBatchRejectsInvalidCosts(t *testing.T) {
+	t.Run("non-finite span", func(t *testing.T) {
+		store := openTestStore(t)
+		span := testSpan(traceID(1), spanID(1), 1, 2)
+		span.CostUSD = f64(math.Inf(1))
+		if err := store.InsertBatch(context.Background(), []Span{span}); !errors.Is(err, ErrCostOutOfRange) {
+			t.Fatalf("got %v, want ErrCostOutOfRange", err)
+		}
+	})
+	t.Run("excessive trace aggregate", func(t *testing.T) {
+		store := openTestStore(t)
+		trace := traceID(2)
+		one := testSpan(trace, spanID(1), 1, 2)
+		two := testSpan(trace, spanID(2), 2, 3)
+		for _, span := range []*Span{&one, &two} {
+			span.Kind = "llm"
+			span.InputTokens, span.OutputTokens, span.CostUSD = i64(1), i64(1), f64(600_000)
+		}
+		if err := store.InsertBatch(context.Background(), []Span{one, two}); !errors.Is(err, ErrCostOutOfRange) {
+			t.Fatalf("got %v, want ErrCostOutOfRange", err)
+		}
+		var count int
+		if err := store.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil || count != 0 {
+			t.Fatalf("rollback count=%d err=%v", count, err)
+		}
+	})
 }
 
 func TestNullPropagation(t *testing.T) {
@@ -307,6 +337,61 @@ func TestDashboardPercentiles(t *testing.T) {
 	}
 }
 
+func TestGetTraceLoadsOnlyTreeFields(t *testing.T) {
+	store := openTestStore(t)
+	span := testSpan(traceID(7), spanID(7), 1, 2)
+	span.Kind, span.RequestModel, span.InputTokens, span.OutputTokens = "llm", "gpt-4o", i64(10), i64(2)
+	span.InputContent, span.OutputContent = strings.Repeat("input", 1000), strings.Repeat("output", 1000)
+	span.Attributes, span.Events, span.Links, span.Resource, span.Scope = `{"large":"attribute"}`, `[{"large":"event"}]`, `[{"large":"link"}]`, `{"large":"resource"}`, `{"large":"scope"}`
+	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	_, tree, err := store.GetTrace(context.Background(), span.TraceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tree) != 1 || tree[0].InputContent != "" || tree[0].OutputContent != "" || tree[0].Attributes != "" || tree[0].Events != "" || tree[0].Links != "" || tree[0].Resource != "" || tree[0].Scope != "" {
+		t.Fatalf("tree loaded payload fields: %+v", tree)
+	}
+	full, err := store.GetSpan(context.Background(), span.TraceID, span.SpanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if full.InputContent != span.InputContent || full.Attributes != span.Attributes {
+		t.Fatal("full span payload was not available separately")
+	}
+}
+
+func TestDashboardRejectsInvalidStoredCost(t *testing.T) {
+	store := openTestStore(t)
+	span := testSpan(traceID(8), spanID(8), 1, 2)
+	span.Kind, span.InputTokens, span.OutputTokens, span.CostUSD = "llm", i64(1), i64(1), f64(1)
+	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.w.Exec("UPDATE traces SET cost_usd=?", math.Inf(1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Dashboard(context.Background(), 0, 0); !errors.Is(err, ErrCostOutOfRange) {
+		t.Fatalf("got %v, want ErrCostOutOfRange", err)
+	}
+}
+
+func TestDashboardRejectsNonFiniteDuration(t *testing.T) {
+	store := openTestStore(t)
+	span := testSpan(traceID(10), spanID(10), 1, 2)
+	span.Kind, span.RequestModel, span.InputTokens, span.OutputTokens, span.CostUSD = "llm", "model", i64(1), i64(1), f64(1)
+	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.w.Exec("UPDATE spans SET duration_ms=?", math.Inf(1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Dashboard(context.Background(), 0, 0); err == nil {
+		t.Fatal("expected non-finite aggregate to fail")
+	}
+}
+
 func TestSearchLiteral(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(9), spanID(9), 1, 2)
@@ -320,6 +405,23 @@ func TestSearchLiteral(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].TraceID != span.TraceID || hits[0].SpanID != span.SpanID {
 		t.Fatalf("unexpected hits: %+v", hits)
+	}
+}
+
+func TestPurgeReportsCommittedDeletesWhenVacuumFails(t *testing.T) {
+	store := openTestStore(t)
+	span := testSpan(traceID(9), spanID(9), 1, 2)
+	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	vacuumErr := errors.New("vacuum failed")
+	deleted, err := store.purge(context.Background(), 3, func(context.Context) error { return vacuumErr })
+	if deleted != 1 || !errors.Is(err, vacuumErr) {
+		t.Fatalf("deleted=%d err=%v", deleted, err)
+	}
+	var count int
+	if err := store.Reader().QueryRow("SELECT count(*) FROM traces").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("committed trace count=%d err=%v", count, err)
 	}
 }
 

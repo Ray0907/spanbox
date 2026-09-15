@@ -18,6 +18,7 @@ import (
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -185,6 +186,17 @@ func TestIngestEndpoint(t *testing.T) {
 	}
 }
 
+func TestTraceFilterRejectsNonFiniteDuration(t *testing.T) {
+	for _, value := range []string{"NaN", "Inf", "-Inf"} {
+		t.Run(value, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/?min_duration="+url.QueryEscape(value), nil)
+			if _, _, err := traceFilter(req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
 func TestTracePages(t *testing.T) {
 	handler, database := newTestHandler(t, "")
 	jsonBody, _ := traceFixture(t)
@@ -192,11 +204,11 @@ func TestTracePages(t *testing.T) {
 		t.Fatalf("ingest status=%d", response.Code)
 	}
 	response := request(t, handler, http.MethodGet, "/", "", "", nil)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "agent-root") || !strings.Contains(response.Body.String(), "gpt-4o") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "agent-root") || !strings.Contains(response.Body.String(), "gpt-4o") || !strings.Contains(response.Body.String(), `hx-target="#trace-results"`) {
 		t.Fatalf("trace list status=%d body=%q", response.Code, response.Body.String())
 	}
 	partial := request(t, handler, http.MethodGet, "/?partial=1&errors=1", "", "", nil)
-	if partial.Code != http.StatusOK || strings.Contains(partial.Body.String(), "agent-root") || !strings.Contains(partial.Body.String(), "<tbody") {
+	if partial.Code != http.StatusOK || strings.Contains(partial.Body.String(), "agent-root") || !strings.Contains(partial.Body.String(), `id="trace-results"`) || !strings.Contains(partial.Body.String(), "result-count") {
 		t.Fatalf("partial response status=%d body=%q", partial.Code, partial.Body.String())
 	}
 	traceID := "0102030405060708090a0b0c0d0e0f10"
@@ -282,6 +294,108 @@ func TestDashboardSearchAndSQLPages(t *testing.T) {
 	}
 }
 
+func TestIngestRejectsExcessiveSpanCost(t *testing.T) {
+	handler, _ := newTestHandler(t, "")
+	jsonBody, _ := traceFixture(t)
+	var requestBody collectortracepb.ExportTraceServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &requestBody); err != nil {
+		t.Fatal(err)
+	}
+	span := requestBody.ResourceSpans[0].ScopeSpans[0].Spans[1]
+	span.Attributes = append(span.Attributes,
+		&commonpb.KeyValue{Key: "llm.cost.total", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: 1e308}}},
+	)
+	body, err := protojson.Marshal(&requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", body)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestIngestRejectsExcessiveTraceCost(t *testing.T) {
+	handler, _ := newTestHandler(t, "")
+	jsonBody, _ := traceFixture(t)
+	var requestBody collectortracepb.ExportTraceServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &requestBody); err != nil {
+		t.Fatal(err)
+	}
+	spans := requestBody.ResourceSpans[0].ScopeSpans[0].Spans
+	spans[0].Attributes = append(spans[0].Attributes,
+		&commonpb.KeyValue{Key: "gen_ai.operation.name", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "chat"}}},
+		&commonpb.KeyValue{Key: "llm.cost.total", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: 600_000}}},
+	)
+	spans[1].Attributes = append(spans[1].Attributes,
+		&commonpb.KeyValue{Key: "llm.cost.total", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_DoubleValue{DoubleValue: 600_000}}},
+	)
+	body, err := protojson.Marshal(&requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", body)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestIngestRejectsUnsafeIndexedPath(t *testing.T) {
+	handler, _ := newTestHandler(t, "")
+	jsonBody, _ := traceFixture(t)
+	var requestBody collectortracepb.ExportTraceServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &requestBody); err != nil {
+		t.Fatal(err)
+	}
+	span := requestBody.ResourceSpans[0].ScopeSpans[0].Spans[0]
+	span.Attributes = append(span.Attributes, &commonpb.KeyValue{
+		Key:   "gen_ai.prompt.10001.content",
+		Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "x"}},
+	})
+	body, err := protojson.Marshal(&requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", body)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestIngestBackPressure(t *testing.T) {
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	prices, err := pricing.Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	slots := make(chan struct{}, 1)
+	slots <- struct{}{}
+	handler := NewHandler(Deps{Cfg: config.Config{}, Store: database, Pricing: prices, Logf: t.Logf, ingestSlots: slots})
+	jsonBody, _ := traceFixture(t)
+	response := request(t, handler, http.MethodPost, "/v1/traces", "application/json", "", jsonBody)
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Retry-After") == "" {
+		t.Fatalf("status=%d retry-after=%q body=%q", response.Code, response.Header().Get("Retry-After"), response.Body.String())
+	}
+}
+
+func TestSQLSchemaFailureReturnsServerError(t *testing.T) {
+	handler, database := newTestHandler(t, "secret")
+	if err := database.Reader().Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/sql", nil)
+	req.AddCookie(&http.Cookie{Name: "spanbox_session", Value: sessionValue("secret")})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
 func TestIngestBearerAuth(t *testing.T) {
 	handler, _ := newTestHandler(t, "secret")
 	jsonBody, _ := traceFixture(t)
@@ -350,7 +464,7 @@ func TestNewServerTimeouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := NewServer(Deps{Cfg: config.Config{Port: 9000}, Store: database, Pricing: prices, Logf: t.Logf})
-	if server.Addr != ":9000" || server.ReadHeaderTimeout != config.ReadHeaderTimeout || server.ReadTimeout != config.ReadTimeout || server.IdleTimeout != config.IdleTimeout || server.MaxHeaderBytes != config.MaxHeaderBytes || server.Handler == nil || handler == nil {
+	if server.Addr != ":9000" || server.ReadHeaderTimeout != config.ReadHeaderTimeout || server.ReadTimeout != config.ReadTimeout || server.WriteTimeout != 60*time.Second || server.IdleTimeout != config.IdleTimeout || server.MaxHeaderBytes != config.MaxHeaderBytes || server.Handler == nil || handler == nil {
 		t.Fatalf("unexpected server: %+v", server)
 	}
 }

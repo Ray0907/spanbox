@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sort"
 )
 
@@ -58,6 +59,11 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
 	}
+	for _, span := range spans {
+		if span.CostUSD != nil && !costInRange(*span.CostUSD) {
+			return fmt.Errorf("%w: span %s", ErrCostOutOfRange, span.SpanID)
+		}
+	}
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -90,6 +96,13 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) error {
 	for _, traceID := range traceIDs {
 		if _, err := tx.ExecContext(ctx, recomputeTraceSQL, sql.Named("tid", traceID)); err != nil {
 			return err
+		}
+		var cost sql.NullFloat64
+		if err := tx.QueryRowContext(ctx, "SELECT cost_usd FROM traces WHERE trace_id=?", traceID).Scan(&cost); err != nil {
+			return err
+		}
+		if cost.Valid && !costInRange(cost.Float64) {
+			return fmt.Errorf("%w: trace %s", ErrCostOutOfRange, traceID)
 		}
 	}
 	return tx.Commit()

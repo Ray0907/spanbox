@@ -1,12 +1,23 @@
 package normalize
 
 import (
+	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 )
 
+const maxIndexedArrayIndex = 10000 // ponytail: bounds sparse-slice allocation; long chats stay under this
+
+var ErrIndexedPath = errors.New("indexed attribute path rejected")
+
 func RebuildIndexed(attrs map[string]any, prefix string) (any, bool) {
+	value, ok, err := rebuildIndexed(attrs, prefix)
+	return value, ok && err == nil
+}
+
+func rebuildIndexed(attrs map[string]any, prefix string) (any, bool, error) {
 	start := prefix + "."
 	keys := make([]string, 0)
 	for key := range attrs {
@@ -15,32 +26,56 @@ func RebuildIndexed(attrs map[string]any, prefix string) (any, bool) {
 		}
 	}
 	if len(keys) == 0 {
-		return nil, false
+		return nil, false, nil
 	}
 	sort.Strings(keys)
 	var result any
 	for _, key := range keys {
-		result = setPath(result, strings.Split(strings.TrimPrefix(key, start), "."), attrs[key])
+		var err error
+		result, err = setPath(result, strings.Split(strings.TrimPrefix(key, start), "."), attrs[key])
+		if err != nil {
+			return nil, false, fmt.Errorf("%w: %s: %v", ErrIndexedPath, key, err)
+		}
 	}
-	return result, true
+	return result, true, nil
 }
 
-func setPath(node any, path []string, value any) any {
+func setPath(node any, path []string, value any) (any, error) {
 	if len(path) == 0 {
-		return value
+		return value, nil
 	}
-	if index, err := strconv.Atoi(path[0]); err == nil && index >= 0 {
-		items, _ := node.([]any)
-		if len(items) <= index {
-			items = append(items, make([]any, index-len(items)+1)...)
+	if numeric(path[0]) {
+		index, err := strconv.ParseUint(path[0], 10, 64)
+		if err != nil || index > maxIndexedArrayIndex {
+			return nil, fmt.Errorf("array index must be at most %d", maxIndexedArrayIndex)
 		}
-		items[index] = setPath(items[index], path[1:], value)
-		return items
+		items, _ := node.([]any)
+		if len(items) <= int(index) {
+			items = append(items, make([]any, int(index)-len(items)+1)...)
+		}
+		items[index], err = setPath(items[index], path[1:], value)
+		return items, err
 	}
 	object, _ := node.(map[string]any)
 	if object == nil {
 		object = make(map[string]any)
 	}
-	object[path[0]] = setPath(object[path[0]], path[1:], value)
-	return object
+	child, err := setPath(object[path[0]], path[1:], value)
+	if err != nil {
+		return nil, err
+	}
+	object[path[0]] = child
+	return object, nil
+}
+
+func numeric(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
