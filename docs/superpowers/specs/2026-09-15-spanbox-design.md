@@ -427,3 +427,15 @@ FTS 由 delete trigger 同步。不會留下跨 cutoff 的殘缺 trace。
 - OpenLLMetry legacy 攤平形狀依常數推得，未在現行源碼驗證；fixture 標註 legacy
 - `/sql` 無 engine 級 authorizer，見 §11.2
 - SQLite 單寫者：寫入量遠超數十萬 span/天時就是換儲存層的時機
+
+## 18. Roadmap：儲存層耐久性（2026-09-16 評估，未實作）
+
+參考 Cursor Continuity（S3 唯一真相、本機 NVMe 熱快取、無狀態節點）對 spanbox 的第一性拆解：
+
+- 真正 append-only 且冪等的是 **raw OTLP batch**，不是 SQLite 檔（索引、FTS、trace 重算、retention 都改頁面）。若要 S3 為唯一真相，真相應是 batch segment log，SQLite 只是可丟的本機投影。
+- 分三級，只在觸發條件成立時往下走：
+  1. **Litestream sidecar（0 行 code，現在做）**：SQLite WAL 串流到 S3 / 本機路徑，RPO 數秒，新機器 `litestream restore` 重建。解決「機器沒了資料還在」。實作見 `docs/superpowers/plans/2026-09-16-durability-litestream.md`。
+  2. **S3 segment log（約 600–800 行 Go）**：每個接受的 batch 寫成 `segments/YYYY/MM/DD/<seq>.pb.gz`，ack 前 PUT 或本機先 ack 再非同步上傳；新節點列 prefix 重放；讀者節點 tail 新 segment；retention = 刪日期 prefix。單一 writer、seq 單調即可，不需要 CAS manifest。S3 client 用 SigV4 手寫或 minio-go，不拉 AWS SDK。
+  3. **多 writer + CAS manifest**：Continuity 完整形。B 規模無此需求，多 ingest 節點先用 LB 導向單一 writer。
+- 明確不做：自製 SQLite 頁面級 S3 WAL（Litestream 已做且踩過坑）。
+- 進入第 2 級的觸發條件：跨機器讀同一份資料、retention 超過單機磁碟、部署在會被回收的節點（spot / 無 PV 的 k8s）。
