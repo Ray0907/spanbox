@@ -28,11 +28,11 @@
     grid: color('--line')
   };
 
-  const options = (series, width) => ({
+  const options = (series, width, range) => ({
     width: Math.max(width, 280),
     height: 250,
     tzDate: timestamp => uPlot.tzDate(new Date(timestamp * 1000), 'UTC'),
-    scales: { x: { time: true } },
+    scales: { x: { time: true, range } },
     axes: [
       { stroke: colors.axis, grid: { stroke: colors.grid, width: 1 } },
       { stroke: colors.axis, size: 64, grid: { stroke: colors.grid, width: 1 } }
@@ -43,8 +43,8 @@
   const clean = values => values.map(value => value == null ? null : value);
   const draw = data => {
     const x = data.Days.map(day => Date.parse(`${day}T00:00:00Z`) / 1000);
-    const primary = { stroke: colors.primary, width: 2, points: { stroke: colors.primary, fill: color('--surface'), size: 5 } };
-    const secondary = { stroke: colors.secondary, width: 2, points: { stroke: colors.secondary, fill: color('--surface'), size: 5 } };
+    const primary = { stroke: colors.primary, width: 2, points: { show: true, stroke: colors.primary, fill: color('--surface'), size: 6 } };
+    const secondary = { stroke: colors.secondary, width: 2, points: { show: true, stroke: colors.secondary, fill: color('--surface'), size: 6 } };
     const charts = [
       ['cost', [x, clean(data.DailyCost)], [{ label: 'Cost', ...primary }]],
       ['tokens', [x, clean(data.DailyInput), clean(data.DailyOutput)], [{ label: 'Input', ...primary }, { label: 'Output', ...secondary }]],
@@ -55,7 +55,7 @@
     for (const [name, values, series] of charts) {
       const element = root.querySelector(`[data-chart="${name}"]`);
       if (!element) continue;
-      const plot = new uPlot(options(series, element.clientWidth), values, element);
+      const plot = new uPlot(options(series, element.clientWidth, [data.RangeFrom, data.RangeTo]), values, element);
       new ResizeObserver(entries => {
         const width = Math.floor(entries[0].contentRect.width);
         if (width > 0 && width !== plot.width) plot.setSize({ width: Math.max(width, 280), height: 250 });

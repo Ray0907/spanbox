@@ -324,13 +324,16 @@ func TestDashboardSearchAndSQLPages(t *testing.T) {
 		t.Fatalf("ingest status=%d", response.Code)
 	}
 
-	response := request(t, handler, http.MethodGet, "/dashboard/data?range=7d", "", "", nil)
+	response := request(t, handler, http.MethodGet, "/dashboard/data?range=24h", "", "", nil)
 	var dashboard store.DashboardData
 	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &dashboard) != nil {
 		t.Fatalf("dashboard data status=%d body=%q", response.Code, response.Body.String())
 	}
 	if dashboard.TraceCount != 1 || len(dashboard.Models) == 0 || dashboard.Models[0].Model != "gpt-4o" || len(dashboard.Days) == 0 {
 		t.Fatalf("unexpected dashboard: %+v", dashboard)
+	}
+	if dashboard.RangeFrom >= dashboard.RangeTo || dashboard.RangeTo-dashboard.RangeFrom != int64((24*time.Hour)/time.Second) {
+		t.Fatalf("dashboard range = %d..%d", dashboard.RangeFrom, dashboard.RangeTo)
 	}
 	response = request(t, handler, http.MethodGet, "/dashboard", "", "", nil)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `data-chart="cost"`) {

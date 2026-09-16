@@ -166,6 +166,8 @@ func scanSpan(row scanner) (Span, error) {
 }
 
 type DashboardData struct {
+	RangeFrom      int64
+	RangeTo        int64
 	TotalCost      *float64
 	TotalInput     *int64
 	TotalOutput    *int64
@@ -191,7 +193,7 @@ type ModelRow struct {
 }
 
 func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardData, error) {
-	var data DashboardData
+	data := DashboardData{RangeFrom: fromNs / 1e9, RangeTo: toNs / 1e9}
 	err := s.r.QueryRowContext(ctx, `SELECT count(*), SUM(cost_usd), SUM(input_tokens), SUM(output_tokens),
 		COALESCE(AVG(has_error), 0) FROM traces WHERE start_ns >= ? AND (? = 0 OR start_ns < ?)`, fromNs, toNs, toNs).
 		Scan(&data.TraceCount, &data.TotalCost, &data.TotalInput, &data.TotalOutput, &data.ErrorRate)
