@@ -48,10 +48,30 @@ Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>"
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_AND_EVENT
 ```
 
-Use these variables with the standard OTLP HTTP exporter and your OpenTelemetry instrumentation.
+Use these variables with the standard OTLP HTTP exporter and your OpenTelemetry instrumentation. The official `opentelemetry-instrumentation-google-genai` requires `SPAN_AND_EVENT`; it rejects `true` and falls back to capturing no message content. Other GenAI instrumentations commonly accept `true` instead.
+
+### Gemini CLI
+
+```json
+// ~/.gemini/settings.json
+{
+  "telemetry": {
+    "enabled": true,
+    "target": "local",
+    "otlpEndpoint": "http://localhost:4318",
+    "otlpProtocol": "http",
+    "logPrompts": true,
+    "useCollector": false
+  }
+}
+```
+
+Gemini CLI reports model calls as OpenTelemetry GenAI log events. spanbox turns each call into an `llm` span and groups calls into one trace per CLI session; metrics are accepted and discarded. `POST /` detects JSON signals, but treats protobuf as traces; send protobuf logs to `/v1/logs`.
+
+Gemini CLI 0.26.0 HTTP telemetry has no setting equivalent to `otlpHeaders`, and its OTLP exporters are constructed without headers, so it cannot send the Bearer header required by `AUTH_TOKEN` today. Use an OTLP collector or reverse proxy that adds the header when authentication is required.
 
 ### Langfuse Python SDK (v3 and v4)
 

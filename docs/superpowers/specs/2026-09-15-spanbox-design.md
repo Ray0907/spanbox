@@ -19,7 +19,7 @@
 
 - 多租戶、多使用者帳密、RBAC
 - Prompt management、datasets、playground、evals/scores 寫入
-- gRPC OTLP、OTLP metrics/logs
+- gRPC OTLP（OTLP/HTTP logs 僅接受 GenAI operation events；metrics 接受後丟棄）
 - 叢集、S3、Parquet（儲存層走 interface，日後可換，現在不付）
 - 自有 SDK、Langfuse ingestion API 相容
 - 內容截斷或遮罩（`REDACT` 之類日後再加）
