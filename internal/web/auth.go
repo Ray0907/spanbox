@@ -6,13 +6,12 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"mime"
 	"net/http"
 	"strings"
 )
 
-const loginFailure = "invalid token\n"
+const loginFailure = "Invalid token."
 
 func tokenEqual(a, b string) bool {
 	aHash := sha256.Sum256([]byte(a))
@@ -32,7 +31,7 @@ func authenticate(token string, next http.Handler) http.Handler {
 	}
 	session := sessionValue(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || r.URL.Path == "/login" {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/login" || strings.HasPrefix(r.URL.Path, "/static/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -54,11 +53,22 @@ func authenticate(token string, next http.Handler) http.Handler {
 	})
 }
 
+type loginPage struct {
+	Error string
+}
+
+func (deps Deps) renderLogin(w http.ResponseWriter, status int, errorMessage string) {
+	if status != http.StatusOK {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
+	}
+	deps.render(w, "login", loginPage{Error: errorMessage}, "templates/login.html")
+}
+
 func (deps Deps) login(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, `<!doctype html><html><body><main><h1>spanbox login</h1><form method="post"><label>Token <input name="token" type="password" required></label><button type="submit">Log in</button></form></main></body></html>`)
+		deps.renderLogin(w, http.StatusOK, "")
 	case http.MethodPost:
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || mediaType != "application/x-www-form-urlencoded" {
@@ -72,11 +82,11 @@ func (deps Deps) login(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
 				return
 			}
-			http.Error(w, loginFailure, http.StatusUnauthorized)
+			deps.renderLogin(w, http.StatusUnauthorized, loginFailure)
 			return
 		}
 		if !tokenEqual(r.PostForm.Get("token"), deps.Cfg.AuthToken) {
-			http.Error(w, loginFailure, http.StatusUnauthorized)
+			deps.renderLogin(w, http.StatusUnauthorized, loginFailure)
 			return
 		}
 		http.SetCookie(w, &http.Cookie{

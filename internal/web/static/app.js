@@ -1,37 +1,65 @@
 (() => {
+  const markSelectedSpan = summary => {
+    document.querySelectorAll('.tree-node > summary[aria-current="true"]').forEach(row => {
+      row.classList.remove('is-selected');
+      row.removeAttribute('aria-current');
+    });
+    summary.classList.add('is-selected');
+    summary.setAttribute('aria-current', 'true');
+  };
+
+  const firstSpan = document.querySelector('.tree-node > summary');
+  if (firstSpan && document.querySelector('#panel .span-detail')) markSelectedSpan(firstSpan);
+
+  document.addEventListener('htmx:beforeRequest', event => {
+    const summary = event.detail.elt.closest('.tree-node > summary');
+    if (summary) markSelectedSpan(summary);
+  });
+
   const root = document.querySelector('[data-dashboard-endpoint]');
   if (!root || typeof uPlot === 'undefined') return;
 
+  const styles = getComputedStyle(document.documentElement);
+  const color = name => styles.getPropertyValue(name).trim();
   const colors = {
-    blue: '#4f83ef',
-    violet: '#8b6be8',
-    teal: '#35a6ad',
-    amber: '#d69a22',
-    red: '#d55b52'
+    primary: color('--accent'),
+    secondary: color('--chart-secondary'),
+    axis: color('--muted'),
+    grid: color('--line')
   };
 
-  const options = (title, series, width) => ({
-    title,
+  const options = (series, width) => ({
     width: Math.max(width, 280),
     height: 250,
-    tzDate: ts => uPlot.tzDate(new Date(ts * 1000), 'UTC'),
+    tzDate: timestamp => uPlot.tzDate(new Date(timestamp * 1000), 'UTC'),
     scales: { x: { time: true } },
-    axes: [{ stroke: '#78869a', grid: { stroke: '#d5dde733' } }, { stroke: '#78869a', size: 64, grid: { stroke: '#d5dde733' } }],
+    axes: [
+      { stroke: colors.axis, grid: { stroke: colors.grid, width: 1 } },
+      { stroke: colors.axis, size: 64, grid: { stroke: colors.grid, width: 1 } }
+    ],
     series: [{ label: 'UTC day' }, ...series]
   });
 
   const clean = values => values.map(value => value == null ? null : value);
   const draw = data => {
     const x = data.Days.map(day => Date.parse(`${day}T00:00:00Z`) / 1000);
+    const primary = { stroke: colors.primary, width: 2, points: { stroke: colors.primary, fill: color('--surface'), size: 5 } };
+    const secondary = { stroke: colors.secondary, width: 2, points: { stroke: colors.secondary, fill: color('--surface'), size: 5 } };
     const charts = [
-      ['cost', 'Daily cost (USD)', [x, clean(data.DailyCost)], [{ label: 'Cost', stroke: colors.blue, width: 2 }]],
-      ['tokens', 'Daily tokens', [x, clean(data.DailyInput), clean(data.DailyOutput)], [{ label: 'Input', stroke: colors.blue, width: 2 }, { label: 'Output', stroke: colors.violet, width: 2 }]],
-      ['latency', 'LLM latency (ms)', [x, clean(data.DailyP50), clean(data.DailyP95)], [{ label: 'p50', stroke: colors.teal, width: 2 }, { label: 'p95', stroke: colors.amber, width: 2 }]],
-      ['errors', 'Trace error rate (%)', [x, data.DailyErrorRate.map(value => value * 100)], [{ label: 'Errors', stroke: colors.red, width: 2 }]]
+      ['cost', [x, clean(data.DailyCost)], [{ label: 'Cost', ...primary }]],
+      ['tokens', [x, clean(data.DailyInput), clean(data.DailyOutput)], [{ label: 'Input', ...primary }, { label: 'Output', ...secondary }]],
+      ['latency', [x, clean(data.DailyP50), clean(data.DailyP95)], [{ label: 'p50', ...primary }, { label: 'p95', ...secondary }]],
+      ['errors', [x, data.DailyErrorRate.map(value => value * 100)], [{ label: 'Errors', ...primary }]]
     ];
-    for (const [name, title, values, series] of charts) {
+
+    for (const [name, values, series] of charts) {
       const element = root.querySelector(`[data-chart="${name}"]`);
-      if (element) new uPlot(options(title, series, element.clientWidth), values, element);
+      if (!element) continue;
+      const plot = new uPlot(options(series, element.clientWidth), values, element);
+      new ResizeObserver(entries => {
+        const width = Math.floor(entries[0].contentRect.width);
+        if (width > 0 && width !== plot.width) plot.setSize({ width: Math.max(width, 280), height: 250 });
+      }).observe(element);
     }
   };
 
@@ -42,6 +70,10 @@
     })
     .then(draw)
     .catch(error => {
-      root.insertAdjacentText('afterbegin', error.message);
+      const notice = document.createElement('p');
+      notice.className = 'notice error';
+      notice.setAttribute('role', 'alert');
+      notice.textContent = error.message;
+      root.prepend(notice);
     });
 })();

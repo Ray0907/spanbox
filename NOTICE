@@ -4,3 +4,7 @@ spanbox bundles third-party files:
   https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json
 - internal/web/static/htmx.min.js: htmx (Zero-Clause BSD), https://htmx.org
 - internal/web/static/uPlot.*: uPlot (MIT License), https://github.com/leeoniya/uPlot
+- internal/web/static/fonts/bricolage-grotesque-latin.woff2: Bricolage Grotesque
+  (SIL Open Font License 1.1), https://fonts.google.com/specimen/Bricolage+Grotesque
+- internal/web/static/fonts/source-sans-3-latin.woff2: Source Sans 3
+  (SIL Open Font License 1.1), https://fonts.google.com/specimen/Source+Sans+3

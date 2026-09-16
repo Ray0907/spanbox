@@ -24,6 +24,7 @@ var webFiles embed.FS
 
 type layoutData struct {
 	Title      string
+	Section    string
 	SQLEnabled bool
 	Charts     bool
 	Version    string
@@ -48,7 +49,7 @@ func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filter, view, err := traceFilter(r)
-	page := tracesPage{layoutData: layoutData{Title: "Traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view}
+	page := tracesPage{layoutData: layoutData{Title: "Traces", Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view}
 	if err == nil {
 		page.Rows, err = deps.Store.ListTraces(r.Context(), filter)
 		if len(page.Rows) > 50 {
@@ -174,7 +175,7 @@ func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	roots := buildTree(spans)
-	page := tracePage{layoutData: layoutData{Title: trace.Name, SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Trace: trace, Roots: roots}
+	page := tracePage{layoutData: layoutData{Title: trace.Name, Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Trace: trace, Roots: roots}
 	if len(spans) > 0 {
 		selectedSpan, err := deps.Store.GetSpan(r.Context(), traceID, spans[0].SpanID)
 		if err != nil {
@@ -226,7 +227,7 @@ func (deps Deps) dashboard(w http.ResponseWriter, r *http.Request) {
 		rangeValue = "24h"
 	}
 	from, to, err := parseRange(rangeValue, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
-	page := dashboardPage{layoutData: layoutData{Title: "Dashboard", SQLEnabled: deps.Cfg.AuthToken != "", Charts: true, Version: deps.Version}, Range: rangeValue}
+	page := dashboardPage{layoutData: layoutData{Title: "Dashboard", Section: "dashboard", SQLEnabled: deps.Cfg.AuthToken != "", Charts: true, Version: deps.Version}, Range: rangeValue}
 	if err == nil {
 		page.Data, err = deps.Store.Dashboard(r.Context(), from, to)
 	}
@@ -277,7 +278,7 @@ func (deps Deps) search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	page := searchPage{layoutData: layoutData{Title: "Search", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Query: r.URL.Query().Get("q")}
+	page := searchPage{layoutData: layoutData{Title: "Search", Section: "search", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Query: r.URL.Query().Get("q")}
 	var err error
 	if page.Query != "" {
 		page.Hits, err = deps.Store.Search(r.Context(), page.Query, 100)
@@ -311,7 +312,7 @@ func (deps Deps) sqlPage(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	page := sqlPage{layoutData: layoutData{Title: "SQL", SQLEnabled: true, Version: deps.Version}}
+	page := sqlPage{layoutData: layoutData{Title: "SQL", Section: "sql", SQLEnabled: true, Version: deps.Version}}
 	var err error
 	page.Schema, err = deps.schema(r)
 	if err != nil {

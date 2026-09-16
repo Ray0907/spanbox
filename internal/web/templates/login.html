@@ -1,0 +1,27 @@
+{{define "login"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Log in · spanbox</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="login-title">
+      <a class="brand" href="/" aria-label="spanbox traces"><span class="brand-mark"></span>spanbox</a>
+      <div>
+        <h1 id="login-title">Operator access</h1>
+        <p>Use the token configured for this spanbox instance.</p>
+      </div>
+      {{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
+      <form class="login-form" method="post">
+        <label for="login-token">Token</label>
+        <input id="login-token" name="token" type="password" autocomplete="current-password" required autofocus>
+        <button type="submit">Log in</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>{{end}}

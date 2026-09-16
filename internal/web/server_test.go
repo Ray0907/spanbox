@@ -213,6 +213,9 @@ func TestTracePages(t *testing.T) {
 	}
 	traceID := "0102030405060708090a0b0c0d0e0f10"
 	response = request(t, handler, http.MethodGet, "/traces/"+traceID, "", "", nil)
+	if !strings.Contains(response.Body.String(), `class="kind-row llm"`) {
+		t.Fatalf("trace detail missing kind row marker: %q", response.Body.String())
+	}
 	for _, name := range []string{"agent-root", "chat gpt-4o", "lookup-weather"} {
 		if !strings.Contains(response.Body.String(), name) {
 			t.Fatalf("trace detail missing %q: %q", name, response.Body.String())
@@ -423,6 +426,19 @@ func TestIngestBearerAuth(t *testing.T) {
 
 func TestLoginFlow(t *testing.T) {
 	handler, _ := newTestHandler(t, "secret")
+
+	loginPage := request(t, handler, http.MethodGet, "/login", "", "", nil)
+	if loginPage.Code != http.StatusOK || !strings.Contains(loginPage.Body.String(), `href="/static/app.css"`) || !strings.Contains(loginPage.Body.String(), `name="token"`) {
+		t.Fatalf("login page status=%d body=%q", loginPage.Code, loginPage.Body.String())
+	}
+	if got := loginPage.Header().Get("Content-Security-Policy"); got != contentSecurityPolicy {
+		t.Fatalf("login CSP = %q", got)
+	}
+	stylesheet := request(t, handler, http.MethodGet, "/static/app.css", "", "", nil)
+	if stylesheet.Code != http.StatusOK || !strings.Contains(stylesheet.Body.String(), "@font-face") {
+		t.Fatalf("stylesheet status=%d body=%q", stylesheet.Code, stylesheet.Body.String())
+	}
+
 	withoutCookie := request(t, handler, http.MethodGet, "/", "", "", nil)
 	if withoutCookie.Code != http.StatusFound || withoutCookie.Header().Get("Location") != "/login" {
 		t.Fatalf("unauthenticated response: %d location=%q", withoutCookie.Code, withoutCookie.Header().Get("Location"))

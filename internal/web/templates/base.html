@@ -8,24 +8,23 @@
   <link rel="stylesheet" href="/static/app.css">
   {{if .Charts}}<link rel="stylesheet" href="/static/uPlot.min.css">{{end}}
   <script src="/static/htmx.min.js" defer></script>
-  {{if .Charts}}<script src="/static/uPlot.min.js" defer></script><script src="/static/app.js" defer></script>{{end}}
+  {{if .Charts}}<script src="/static/uPlot.min.js" defer></script>{{end}}
+  <script src="/static/app.js" defer></script>
 </head>
-<body>
+<body data-section="{{.Section}}">
   <!--
-  THESIS: A trace workbench where hierarchy and evidence outrank decorative metrics.
-  OWN-WORLD: Cool neutral surfaces, crisp rules, compact controls, and one blue action color.
+  THESIS: A compact trace workbench where hierarchy and evidence outrank decoration.
+  OWN-WORLD: Dark ink surfaces, luminous rose signals, square corners, and hairline structure.
   STORY: Operators find a trace, scan its structure, then inspect the exact telemetry behind it.
-  FIRST VIEWPORT: A slim navigation rail tops a dense filter bar and full-width operational table.
-  FORM: Restrained observability console, fixed by the normative product specification.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+  FIRST VIEWPORT: A precise navigation bar tops dense filters and operational data.
   -->
   <header class="topbar">
     <a class="brand" href="/" aria-label="spanbox traces"><span class="brand-mark"></span>spanbox</a>
     <nav aria-label="Primary navigation">
-      <a href="/">Traces</a>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/search">Search</a>
-      {{if .SQLEnabled}}<a href="/sql">SQL</a>{{end}}
+      <a href="/" {{if eq .Section "traces"}}aria-current="page"{{end}}>Traces</a>
+      <a href="/dashboard" {{if eq .Section "dashboard"}}aria-current="page"{{end}}>Dashboard</a>
+      <a href="/search" {{if eq .Section "search"}}aria-current="page"{{end}}>Search</a>
+      {{if .SQLEnabled}}<a href="/sql" {{if eq .Section "sql"}}aria-current="page"{{end}}>SQL</a>{{end}}
     </nav>
     <span class="utc-note">Times in UTC</span>
   </header>

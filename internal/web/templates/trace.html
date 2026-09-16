@@ -16,7 +16,7 @@
 {{end}}
 {{define "node"}}
 <details class="tree-node" open>
-  <summary hx-get="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-target="#panel" hx-swap="innerHTML">
+  <summary class="kind-row {{.Span.Kind}}" hx-get="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-target="#panel" hx-swap="innerHTML">
     <span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span>
     <span class="tree-name">{{.Span.Name}}</span>
     <span class="tree-model">{{spanModel .Span}}</span>

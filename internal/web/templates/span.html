@@ -1,5 +1,5 @@
 {{define "span"}}<article class="span-detail">
-  <header><div><span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span><h2>{{.Span.Name}}</h2></div><span class="mono">{{.Span.SpanID}}</span></header>
+  <header class="kind-row {{.Span.Kind}}"><div><span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span><h2>{{.Span.Name}}</h2></div><span class="mono">{{.Span.SpanID}}</span></header>
   <dl class="metadata">
     <div><dt>Model</dt><dd>{{if spanModel .Span}}{{spanModel .Span}}{{else}}—{{end}}</dd></div>
     <div><dt>Provider</dt><dd>{{if .Span.Provider}}{{.Span.Provider}}{{else}}—{{end}}</dd></div>

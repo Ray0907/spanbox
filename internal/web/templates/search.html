@@ -7,7 +7,7 @@
 </form>
 {{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
 {{if .Query}}<section class="search-results"><h2>Results for “{{.Query}}”</h2>
-  {{range .Hits}}<article>
+  {{range .Hits}}<article class="kind-row {{.Kind}}">
     <div><span class="kind {{.Kind}}">{{.Kind}}</span><a href="/traces/{{.TraceID}}">{{.TraceName}}</a><span>/</span><strong>{{.SpanName}}</strong></div>
     <p>{{if .Model}}{{.Model}} · {{end}}{{timeUTC .StartNs}}</p>
     <pre>{{.Snippet}}</pre>
