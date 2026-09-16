@@ -40,6 +40,17 @@ All configuration is optional.
 
 Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled.
 
+## Durability with Litestream
+
+[Litestream](https://litestream.io/) continuously replicates `spanbox.db` with an RPO of approximately its 1-second sync interval, restores the database onto a new machine, and requires no spanbox changes. Install Litestream 0.5.x on macOS with `brew install benbjohnson/litestream/litestream`, then copy [`deploy/litestream/.env.example`](deploy/litestream/.env.example) to `deploy/litestream/.env` and use the [Docker Compose recipe](deploy/litestream/docker-compose.yml). On a fresh volume, restore before starting spanbox:
+
+```sh
+cd deploy/litestream
+docker compose run --rm litestream restore -if-replica-exists -o /data/spanbox.db /data/spanbox.db
+```
+
+Keep a single writer: never run two spanbox instances against the same restored database file. Restore before spanbox starts because spanbox creates an empty database otherwise, which Litestream could replicate over the good replica; `-if-replica-exists` makes first deployment safe when no backup exists, and automated deployments should enforce restore-before-spanbox with an init container and `depends_on` ordering.
+
 ## Export traces
 
 ### Python OpenTelemetry

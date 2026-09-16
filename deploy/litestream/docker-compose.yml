@@ -1,0 +1,25 @@
+services:
+  spanbox:
+    image: ghcr.io/ray0907/spanbox:latest
+    ports:
+      - "4318:4318"
+    environment:
+      AUTH_TOKEN: ${AUTH_TOKEN:-}
+    volumes:
+      - spanbox-data:/data
+    restart: unless-stopped
+
+  litestream:
+    image: litestream/litestream:0.5.17
+    command: replicate -config /etc/litestream.yml
+    env_file: .env
+    volumes:
+      - spanbox-data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    restart: unless-stopped
+
+# Restore a fresh volume before starting spanbox:
+# docker compose run --rm litestream restore -if-replica-exists -o /data/spanbox.db /data/spanbox.db
+
+volumes:
+  spanbox-data:
