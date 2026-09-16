@@ -23,7 +23,7 @@
     <span class="tree-model">{{spanModel .Span}}</span>
     <span class="tree-tokens">{{if or .Span.InputTokens .Span.OutputTokens}}{{tokens .Span.InputTokens}} / {{tokens .Span.OutputTokens}}{{end}}</span>
     <span class="tree-duration">{{duration .Span.DurationMs}}</span>
-    <span class="waterfall" aria-label="Starts at {{.OffsetPct}} percent; spans {{.WidthPct}} percent of trace"><span class="waterfall-bar" style="left:{{.OffsetPct}}%;width:{{.WidthPct}}%"></span></span>
+    <svg class="waterfall" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="Starts at {{.OffsetPct}} percent; spans {{.WidthPct}} percent of trace"><rect class="waterfall-bar" x="{{.OffsetPct}}" width="{{.WidthPct}}" height="8"></rect></svg>
   </summary>
   <div class="children">{{range .Children}}{{template "node" .}}{{end}}</div>
 </details>

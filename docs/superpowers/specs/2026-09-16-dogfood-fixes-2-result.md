@@ -16,6 +16,10 @@
 - Browser-checked dark and light desktop layouts plus the narrow layout against a local instance on port 4319. The Impeccable detector returned no findings in degraded regex mode because its optional HTML parser modules were unavailable.
 - Refreshed only `docs/screenshots/trace.png` and `docs/screenshots/trace-light.png` using newly populated demo data.
 
+## Follow-up: CSP-safe waterfall
+
+A live check found that CSP correctly blocked the waterfall's inline `style` geometry, leaving every bar at zero width. The bars now use inline SVG with numeric `x` and `width` geometry attributes while retaining `fill: var(--kind-color)` in the external stylesheet. A regression assertion rejects any `style="` attribute on the trace page, browser verification confirmed non-zero rendered SVG widths under the existing CSP, and both trace screenshots were refreshed.
+
 ## Skipped
 
 Nothing from the spec.

@@ -363,8 +363,11 @@ func TestTracePages(t *testing.T) {
 	if !strings.Contains(response.Body.String(), `class="kind-row llm"`) {
 		t.Fatalf("trace detail missing kind row marker: %q", response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), `style="left:0%;width:100%"`) || !strings.Contains(response.Body.String(), `style="left:17%;width:67%"`) {
-		t.Fatalf("trace detail missing waterfall geometry: %q", response.Body.String())
+	if strings.Contains(response.Body.String(), `style="`) {
+		t.Fatalf("trace detail contains CSP-blocked inline styles: %q", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `<rect class="waterfall-bar" x="0" width="100" height="8">`) || !strings.Contains(response.Body.String(), `<rect class="waterfall-bar" x="17" width="67" height="8">`) {
+		t.Fatalf("trace detail missing SVG waterfall geometry: %q", response.Body.String())
 	}
 	if !strings.Contains(response.Body.String(), `class="time-ruler"`) || !strings.Contains(response.Body.String(), "300ms") {
 		t.Fatalf("trace detail missing time ruler: %q", response.Body.String())
