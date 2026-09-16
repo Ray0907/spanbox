@@ -307,6 +307,42 @@ func TestListTracesFilters(t *testing.T) {
 	}
 }
 
+func TestListSessions(t *testing.T) {
+	store := openTestStore(t)
+	first := testSpan(traceID(1), spanID(1), 100, 200)
+	first.Kind, first.ServiceName, first.SessionID, first.RequestModel = "llm", "claude-cli", "session-a", "claude-a"
+	first.InputTokens, first.OutputTokens, first.CostUSD = i64(10), i64(2), f64(0.01)
+	second := testSpan(traceID(2), spanID(2), 300, 500)
+	second.Kind, second.ServiceName, second.SessionID, second.RequestModel = "llm", "claude-cli", "session-a", "claude-b"
+	second.InputTokens, second.OutputTokens, second.CostUSD = i64(20), i64(3), f64(0.02)
+	other := testSpan(traceID(3), spanID(3), 600, 700)
+	other.Kind, other.SessionID, other.RequestModel = "llm", "session-b", "other"
+	other.OutputTokens, other.CostUSD = i64(1), f64(0.03)
+	withoutSession := testSpan(traceID(4), spanID(4), 800, 900)
+	if err := store.InsertBatch(context.Background(), []Span{first, second, other, withoutSession}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := store.ListSessions(context.Background(), SessionFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].SessionID != "session-b" || rows[1].SessionID != "session-a" {
+		t.Fatalf("rows=%+v", rows)
+	}
+	row := rows[1]
+	if row.ServiceName != "claude-cli" || row.FirstNs != 100 || row.LastNs != 500 || row.TraceCount != 2 || row.LLMCount != 2 || row.InputTokens == nil || *row.InputTokens != 30 || row.OutputTokens == nil || *row.OutputTokens != 5 || row.CostUSD == nil || math.Abs(*row.CostUSD-0.03) > 1e-12 || row.Models != "claude-a,claude-b" {
+		t.Fatalf("session row=%+v", row)
+	}
+	if rows[0].InputTokens != nil {
+		t.Fatalf("NULL input did not propagate: %+v", rows[0])
+	}
+	page, err := store.ListSessions(context.Background(), SessionFilter{CursorLastNs: rows[0].LastNs, CursorSessionID: rows[0].SessionID, Limit: 10})
+	if err != nil || len(page) != 1 || page[0].SessionID != "session-a" {
+		t.Fatalf("cursor rows=%+v err=%v", page, err)
+	}
+}
+
 func TestDashboardPercentiles(t *testing.T) {
 	store := openTestStore(t)
 	day1 := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)

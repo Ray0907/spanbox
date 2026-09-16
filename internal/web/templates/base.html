@@ -22,6 +22,7 @@
     <a class="brand" href="/" aria-label="spanbox traces"><span class="brand-mark"></span>spanbox</a>
     <nav aria-label="Primary navigation">
       <a href="/" {{if eq .Section "traces"}}aria-current="page"{{end}}>Traces</a>
+      <a href="/sessions" {{if eq .Section "sessions"}}aria-current="page"{{end}}>Sessions</a>
       <a href="/dashboard" {{if eq .Section "dashboard"}}aria-current="page"{{end}}>Dashboard</a>
       <a href="/search" {{if eq .Section "search"}}aria-current="page"{{end}}>Search</a>
       {{if .SQLEnabled}}<a href="/sql" {{if eq .Section "sql"}}aria-current="page"{{end}}>SQL</a>{{end}}

@@ -22,6 +22,80 @@ type TraceFilter struct {
 	Limit         int
 }
 
+type SessionFilter struct {
+	FromNs          int64
+	ToNs            int64
+	CursorLastNs    int64
+	CursorSessionID string
+	Limit           int
+}
+
+type SessionRow struct {
+	SessionID    string
+	ServiceName  string
+	FirstNs      int64
+	LastNs       int64
+	TraceCount   int64
+	LLMCount     int64
+	InputTokens  *int64
+	OutputTokens *int64
+	CostUSD      *float64
+	Models       string
+}
+
+func (s *Store) ListSessions(ctx context.Context, filter SessionFilter) ([]SessionRow, error) {
+	selected := `SELECT * FROM traces WHERE session_id<>''`
+	var args []any
+	if filter.FromNs != 0 {
+		selected += " AND start_ns >= ?"
+		args = append(args, filter.FromNs)
+	}
+	if filter.ToNs != 0 {
+		selected += " AND start_ns < ?"
+		args = append(args, filter.ToNs)
+	}
+	query := `WITH selected AS (` + selected + `), model_rows AS (
+		SELECT s.session_id, COALESCE(NULLIF(sp.response_model,''), sp.request_model) AS model, MIN(sp.start_ns) AS first_ns
+		FROM selected s JOIN spans sp ON sp.trace_id=s.trace_id
+		WHERE COALESCE(NULLIF(sp.response_model,''), sp.request_model)<>'' GROUP BY s.session_id, model
+	), models AS (
+		SELECT session_id, group_concat(model, ',') AS names FROM
+		(SELECT * FROM model_rows ORDER BY session_id, first_ns, model) GROUP BY session_id
+	)
+	SELECT s.session_id,
+		(SELECT service_name FROM selected x WHERE x.session_id=s.session_id ORDER BY start_ns, trace_id LIMIT 1),
+		MIN(s.start_ns), MAX(s.end_ns), COUNT(*), SUM(s.llm_count),
+		CASE WHEN SUM(s.input_tokens IS NULL)>0 THEN NULL ELSE SUM(s.input_tokens) END,
+		CASE WHEN SUM(s.output_tokens IS NULL)>0 THEN NULL ELSE SUM(s.output_tokens) END,
+		CASE WHEN SUM(s.cost_usd IS NULL)>0 THEN NULL ELSE SUM(s.cost_usd) END,
+		COALESCE(m.names,'')
+	FROM selected s LEFT JOIN models m ON m.session_id=s.session_id GROUP BY s.session_id`
+	if filter.CursorLastNs != 0 {
+		query += " HAVING (MAX(s.end_ns), s.session_id) < (?, ?)"
+		args = append(args, filter.CursorLastNs, filter.CursorSessionID)
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	query += " ORDER BY MAX(s.end_ns) DESC, s.session_id DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := s.r.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []SessionRow
+	for rows.Next() {
+		var row SessionRow
+		if err := rows.Scan(&row.SessionID, &row.ServiceName, &row.FirstNs, &row.LastNs, &row.TraceCount, &row.LLMCount, &row.InputTokens, &row.OutputTokens, &row.CostUSD, &row.Models); err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
 type TraceRow struct {
 	TraceID      string
 	Name         string

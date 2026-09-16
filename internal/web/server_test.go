@@ -396,6 +396,21 @@ func TestTracePages(t *testing.T) {
 	}
 }
 
+func TestSessionsPage(t *testing.T) {
+	handler, database := newTestHandler(t, "")
+	span := store.Span{TraceID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", SpanID: "bbbbbbbbbbbbbbbb", Name: "chat", Kind: "llm", ServiceName: "claude-cli", StartNs: time.Now().Add(-time.Minute).UnixNano(), EndNs: time.Now().UnixNano(), DurationMs: 60_000, RequestModel: "claude-haiku", InputTokens: int64ptr(10), OutputTokens: int64ptr(2), CostUSD: float64ptr(0.001), SessionID: "session-page", Attributes: "{}", Events: "[]", Links: "[]", Resource: "{}", Scope: "{}"}
+	if err := database.InsertBatch(context.Background(), []store.Span{span}); err != nil {
+		t.Fatal(err)
+	}
+	response := request(t, handler, http.MethodGet, "/sessions", "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "session-page") || !strings.Contains(response.Body.String(), `href="/?session=session-page"`) || !strings.Contains(response.Body.String(), `href="/sessions" aria-current="page"`) {
+		t.Fatalf("sessions status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func int64ptr(value int64) *int64       { return &value }
+func float64ptr(value float64) *float64 { return &value }
+
 func TestDashboardSearchAndSQLPages(t *testing.T) {
 	handler, _ := newTestHandler(t, "")
 	jsonBody, _ := traceFixture(t)

@@ -1,0 +1,42 @@
+{{define "content"}}
+<section class="page-heading">
+  <div>
+    <h1>Sessions</h1>
+    <p>Model calls grouped by conversation.</p>
+  </div>
+</section>
+{{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
+<form class="filters" method="get" action="/sessions">
+  <label>Range
+    <select name="range">
+      <option value="" {{if eq .Range ""}}selected{{end}}>All retained</option>
+      <option value="15m" {{if eq .Range "15m"}}selected{{end}}>15 minutes</option>
+      <option value="1h" {{if eq .Range "1h"}}selected{{end}}>1 hour</option>
+      <option value="24h" {{if eq .Range "24h"}}selected{{end}}>24 hours</option>
+      <option value="7d" {{if eq .Range "7d"}}selected{{end}}>7 days</option>
+      <option value="custom" {{if eq .Range "custom"}}selected{{end}}>Custom</option>
+    </select>
+  </label>
+  <label>From <input name="from" type="text" value="{{.From}}" placeholder="2026-09-15T00:00:00Z"></label>
+  <label>To <input name="to" type="text" value="{{.To}}" placeholder="2026-09-16T00:00:00Z"></label>
+  <button type="submit">Apply</button>
+</form>
+<div class="table-wrap">
+  <table class="trace-table">
+    <thead><tr><th>Last seen</th><th>Session</th><th>Service</th><th>Models</th><th>Traces</th><th>LLM calls</th><th>Tokens in / out</th><th>Cost</th><th>First seen</th></tr></thead>
+    <tbody>
+    {{range .Rows}}
+      <tr>
+        <td class="nowrap"><time datetime="{{timeUTC .LastNs}}">{{timeUTC .LastNs}}</time></td>
+        <td><a class="trace-link" href="/?session={{.SessionID}}">{{.SessionID}}</a></td>
+        <td>{{.ServiceName}}</td><td>{{if .Models}}{{.Models}}{{else}}—{{end}}</td>
+        <td class="number">{{.TraceCount}}</td><td class="number">{{.LLMCount}}</td>
+        <td class="number">{{tokens .InputTokens}} / {{tokens .OutputTokens}}</td><td class="number">{{money .CostUSD}}</td>
+        <td class="nowrap"><time datetime="{{timeUTC .FirstNs}}">{{timeUTC .FirstNs}}</time></td>
+      </tr>
+    {{else}}<tr><td class="empty" colspan="9">No sessions in this range.</td></tr>{{end}}
+    </tbody>
+  </table>
+</div>
+{{if .NextURL}}<nav class="pagination" aria-label="Pagination"><a class="button secondary" href="{{.NextURL}}">Next page</a></nav>{{end}}
+{{end}}

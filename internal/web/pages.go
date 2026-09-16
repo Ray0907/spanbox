@@ -229,6 +229,50 @@ func compactDuration(ms float64) string {
 	return fmt.Sprintf("%.0fms", ms)
 }
 
+type sessionsPage struct {
+	layoutData
+	Rows    []store.SessionRow
+	Range   string
+	From    string
+	To      string
+	NextURL string
+	Error   string
+}
+
+func (deps Deps) sessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet || r.URL.Path != "/sessions" {
+		http.NotFound(w, r)
+		return
+	}
+	page := sessionsPage{layoutData: layoutData{Title: "Sessions", Section: "sessions", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Range: r.URL.Query().Get("range"), From: r.URL.Query().Get("from"), To: r.URL.Query().Get("to")}
+	from, to, err := parseRange(page.Range, page.From, page.To)
+	filter := store.SessionFilter{FromNs: from, ToNs: to, Limit: 51}
+	if err == nil && r.URL.Query().Get("cursor") != "" {
+		last, sessionID, ok := strings.Cut(r.URL.Query().Get("cursor"), ":")
+		if !ok || sessionID == "" {
+			err = fmt.Errorf("invalid cursor")
+		} else if filter.CursorLastNs, err = strconv.ParseInt(last, 10, 64); err != nil {
+			err = fmt.Errorf("invalid cursor")
+		} else {
+			filter.CursorSessionID = sessionID
+		}
+	}
+	if err == nil {
+		page.Rows, err = deps.Store.ListSessions(r.Context(), filter)
+		if len(page.Rows) > 50 {
+			last := page.Rows[49]
+			page.Rows = page.Rows[:50]
+			query := cloneValues(r.URL.Query())
+			query.Set("cursor", strconv.FormatInt(last.LastNs, 10)+":"+last.SessionID)
+			page.NextURL = "/sessions?" + query.Encode()
+		}
+	}
+	if err != nil {
+		page.Error = err.Error()
+	}
+	deps.render(w, "base", page, "templates/base.html", "templates/sessions.html")
+}
+
 type dashboardPage struct {
 	layoutData
 	Range string

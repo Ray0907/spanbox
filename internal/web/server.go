@@ -74,6 +74,7 @@ func NewHandler(deps Deps) http.Handler {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles))))
 	mux.HandleFunc("/traces/", deps.trace)
 	mux.HandleFunc("/spans/", deps.span)
+	mux.HandleFunc("/sessions", deps.sessions)
 	mux.HandleFunc("/dashboard/data", deps.dashboardData)
 	mux.HandleFunc("/dashboard", deps.dashboard)
 	mux.HandleFunc("/search", deps.search)
