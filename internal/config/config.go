@@ -27,20 +27,26 @@ const (
 )
 
 type Config struct {
-	Port          int
-	DataDir       string
-	RetentionDays int
-	AuthToken     string
-	PricingFile   string
+	Port              int
+	DataDir           string
+	RetentionDays     int
+	AuthToken         string
+	PricingFile       string
+	AnthropicUpstream string
+	OpenAIUpstream    string
+	GeminiUpstream    string
 }
 
 func FromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		Port:          4318,
-		DataDir:       "./data",
-		RetentionDays: 30,
-		AuthToken:     getenv("AUTH_TOKEN"),
-		PricingFile:   getenv("PRICING_FILE"),
+		Port:              4318,
+		DataDir:           "./data",
+		RetentionDays:     30,
+		AuthToken:         getenv("AUTH_TOKEN"),
+		PricingFile:       getenv("PRICING_FILE"),
+		AnthropicUpstream: getenv("ANTHROPIC_UPSTREAM"),
+		OpenAIUpstream:    getenv("OPENAI_UPSTREAM"),
+		GeminiUpstream:    getenv("GEMINI_UPSTREAM"),
 	}
 	if value := getenv("DATA_DIR"); value != "" {
 		cfg.DataDir = value

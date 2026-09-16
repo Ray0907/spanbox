@@ -14,6 +14,7 @@ import (
 
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/pricing"
+	"github.com/Ray0907/spanbox/internal/proxy"
 	"github.com/Ray0907/spanbox/internal/store"
 	"github.com/Ray0907/spanbox/internal/web"
 )
@@ -46,7 +47,16 @@ func main() {
 	if cfg.RetentionDays != 0 {
 		go runRetention(database, cfg.RetentionDays)
 	}
-	server := web.NewServer(web.Deps{Cfg: cfg, Store: database, Pricing: prices, Version: version, Logf: log.Printf})
+	proxyHandler, err := proxy.New(proxy.Config{
+		AnthropicUpstream: cfg.AnthropicUpstream,
+		OpenAIUpstream:    cfg.OpenAIUpstream,
+		GeminiUpstream:    cfg.GeminiUpstream,
+		Logf:              log.Printf,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	server := web.NewServer(web.Deps{Cfg: cfg, Store: database, Pricing: prices, Version: version, Logf: log.Printf, Proxy: proxyHandler})
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

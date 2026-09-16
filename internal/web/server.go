@@ -11,6 +11,7 @@ import (
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/otlp"
 	"github.com/Ray0907/spanbox/internal/pricing"
+	"github.com/Ray0907/spanbox/internal/proxy"
 	"github.com/Ray0907/spanbox/internal/store"
 )
 
@@ -23,6 +24,7 @@ type Deps struct {
 	Logs        *otlp.LogsAdapter
 	Version     string
 	Logf        func(string, ...any)
+	Proxy       http.Handler
 	ingestSlots chan struct{}
 }
 
@@ -36,6 +38,18 @@ func NewHandler(deps Deps) http.Handler {
 	if deps.Logs == nil {
 		deps.Logs = otlp.NewLogsAdapter()
 	}
+	if deps.Proxy == nil {
+		var err error
+		deps.Proxy, err = proxy.New(proxy.Config{
+			AnthropicUpstream: deps.Cfg.AnthropicUpstream,
+			OpenAIUpstream:    deps.Cfg.OpenAIUpstream,
+			GeminiUpstream:    deps.Cfg.GeminiUpstream,
+			Logf:              deps.Logf,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -48,6 +62,7 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("/v1/traces", deps.limitIngest)
 	mux.HandleFunc("/v1/logs", deps.limitIngest)
 	mux.HandleFunc("/v1/metrics", deps.limitIngest)
+	mux.Handle("/proxy/", deps.Proxy)
 	mux.HandleFunc("/login", deps.login)
 	staticFiles, err := fs.Sub(webFiles, "static")
 	if err != nil {
