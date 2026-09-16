@@ -52,6 +52,9 @@ func main() {
 		OpenAIUpstream:    cfg.OpenAIUpstream,
 		GeminiUpstream:    cfg.GeminiUpstream,
 		Logf:              log.Printf,
+		Store:             database,
+		Pricing:           prices,
+		Version:           version,
 	})
 	if err != nil {
 		log.Fatal(err)

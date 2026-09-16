@@ -1,0 +1,3 @@
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_test","model":"gpt-5-mini","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"proxy ok"}]}],"usage":{"input_tokens":20,"input_tokens_details":{"cached_tokens":4},"output_tokens":9,"output_tokens_details":{"reasoning_tokens":3}}}}
+

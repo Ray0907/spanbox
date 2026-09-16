@@ -45,6 +45,9 @@ func NewHandler(deps Deps) http.Handler {
 			OpenAIUpstream:    deps.Cfg.OpenAIUpstream,
 			GeminiUpstream:    deps.Cfg.GeminiUpstream,
 			Logf:              deps.Logf,
+			Store:             deps.Store,
+			Pricing:           deps.Pricing,
+			Version:           deps.Version,
 		})
 		if err != nil {
 			panic(err)

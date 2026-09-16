@@ -1,0 +1,193 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Reply with exactly: proxy ok"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "You are a helpful coding assistant."
+    }
+  ],
+  "tools": [
+    {
+      "name": "Agent"
+    },
+    {
+      "name": "Bash"
+    },
+    {
+      "name": "CronCreate"
+    },
+    {
+      "name": "CronDelete"
+    },
+    {
+      "name": "CronList"
+    },
+    {
+      "name": "DesignSync"
+    },
+    {
+      "name": "Edit"
+    },
+    {
+      "name": "EnterWorktree"
+    },
+    {
+      "name": "ExitWorktree"
+    },
+    {
+      "name": "ListAgents"
+    },
+    {
+      "name": "LSP"
+    },
+    {
+      "name": "Monitor"
+    },
+    {
+      "name": "NotebookEdit"
+    },
+    {
+      "name": "PushNotification"
+    },
+    {
+      "name": "Read"
+    },
+    {
+      "name": "RemoteTrigger"
+    },
+    {
+      "name": "ReportFindings"
+    },
+    {
+      "name": "ScheduleWakeup"
+    },
+    {
+      "name": "SendMessage"
+    },
+    {
+      "name": "Skill"
+    },
+    {
+      "name": "TaskCreate"
+    },
+    {
+      "name": "TaskGet"
+    },
+    {
+      "name": "TaskList"
+    },
+    {
+      "name": "TaskOutput"
+    },
+    {
+      "name": "TaskStop"
+    },
+    {
+      "name": "TaskUpdate"
+    },
+    {
+      "name": "WebFetch"
+    },
+    {
+      "name": "WebSearch"
+    },
+    {
+      "name": "Workflow"
+    },
+    {
+      "name": "Write"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__copy_file"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__create_file"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__download_file_content"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__get_file_metadata"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__get_file_permissions"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__list_recent_files"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__read_file_content"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__search_files"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__share_file"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__trash_file"
+    },
+    {
+      "name": "mcp__claude_ai_Google_Drive__update_file"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__cascading-search"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__create-index-for-model"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__describe-index"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__describe-index-stats"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__list-indexes"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__rerank-documents"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__search-docs"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__search-records"
+    },
+    {
+      "name": "mcp__plugin_pinecone_pinecone__upsert-records"
+    },
+    {
+      "name": "advisor"
+    }
+  ],
+  "metadata": {
+    "user_id": "{\"device_id\":\"device-redacted\",\"account_uuid\":\"account-redacted\",\"session_id\":\"session-test\"}"
+  },
+  "max_tokens": 32000,
+  "thinking": {
+    "budget_tokens": 31999,
+    "type": "enabled",
+    "display": "omitted"
+  },
+  "context_management": {
+    "edits": [
+      {
+        "type": "clear_thinking_20251015",
+        "keep": "all"
+      }
+    ]
+  },
+  "stream": true
+}

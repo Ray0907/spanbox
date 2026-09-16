@@ -1,0 +1,53 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Reply with exactly: proxy ok"
+        }
+      ]
+    }
+  ],
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "You are a helpful coding assistant."
+      }
+    ]
+  },
+  "tools": [
+    {
+      "functionDeclarations": [
+        {
+          "name": "list_directory"
+        },
+        {
+          "name": "read_file"
+        },
+        {
+          "name": "search_file_content"
+        },
+        {
+          "name": "glob"
+        },
+        {
+          "name": "save_memory"
+        },
+        {
+          "name": "google_web_search"
+        },
+        {
+          "name": "write_todos"
+        },
+        {
+          "name": "delegate_to_agent"
+        },
+        {
+          "name": "activate_skill"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {}
+}

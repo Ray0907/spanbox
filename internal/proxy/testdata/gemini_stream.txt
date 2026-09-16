@@ -1,0 +1,4 @@
+data: {"candidates":[{"content":{"parts":[{"text":"proxy ok"}],"role":"model"},"index":0}],"usageMetadata":{"promptTokenCount":9386,"candidatesTokenCount":2,"totalTokenCount":9428,"promptTokensDetails":[{"modality":"TEXT","tokenCount":9386}],"thoughtsTokenCount":40,"serviceTier":"standard"},"modelVersion":"gemini-3.6-flash","responseId":"MLWqaoHcGLfZ1e8P-biEeQ"}
+
+data: {"candidates":[{"content":{"parts":[{"text":"","thoughtSignature":"[trimmed]"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":9386,"candidatesTokenCount":2,"totalTokenCount":9428,"promptTokensDetails":[{"modality":"TEXT","tokenCount":9386}],"thoughtsTokenCount":40,"serviceTier":"standard"},"modelVersion":"gemini-3.6-flash","responseId":"MLWqaoHcGLfZ1e8P-biEeQ"}
+

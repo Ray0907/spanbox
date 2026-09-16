@@ -16,9 +16,10 @@ import (
 var embeddedPrices []byte
 
 type price struct {
-	Input     *float64 `json:"input_cost_per_token"`
-	Output    *float64 `json:"output_cost_per_token"`
-	CacheRead *float64 `json:"cache_read_input_token_cost"`
+	Input         *float64 `json:"input_cost_per_token"`
+	Output        *float64 `json:"output_cost_per_token"`
+	CacheRead     *float64 `json:"cache_read_input_token_cost"`
+	CacheCreation *float64 `json:"cache_creation_input_token_cost"`
 }
 
 type Table struct {
@@ -73,7 +74,7 @@ func loadFrom(r io.Reader) (*Table, error) {
 	return &Table{prices: prices}, nil
 }
 
-func (t *Table) Cost(provider, requestModel, responseModel string, input, output, cacheRead *int64) (float64, bool) {
+func (t *Table) Cost(provider, requestModel, responseModel string, input, output, cacheRead, cacheCreation *int64) (float64, bool) {
 	if input == nil || output == nil {
 		return 0, false
 	}
@@ -85,12 +86,20 @@ func (t *Table) Cost(provider, requestModel, responseModel string, input, output
 	if cacheRead != nil {
 		cached = *cacheRead
 	}
-	uncached := max(*input-cached, 0)
+	created := int64(0)
+	if cacheCreation != nil {
+		created = *cacheCreation
+	}
+	uncached := max(*input-cached-created, 0)
 	cachePrice := *p.Input
 	if p.CacheRead != nil {
 		cachePrice = *p.CacheRead
 	}
-	cost := float64(uncached)**p.Input + float64(cached)*cachePrice + float64(*output)**p.Output
+	creationPrice := *p.Input
+	if p.CacheCreation != nil {
+		creationPrice = *p.CacheCreation
+	}
+	cost := float64(uncached)**p.Input + float64(cached)*cachePrice + float64(created)*creationPrice + float64(*output)**p.Output
 	if cost < 0 || cost > config.MaxCostUSD || math.IsNaN(cost) || math.IsInf(cost, 0) {
 		return 0, false
 	}

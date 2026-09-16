@@ -1,0 +1,10 @@
+data: {"id":"chatcmpl_test","model":"gpt-5-mini","choices":[{"index":0,"delta":{"role":"assistant","content":"proxy "},"finish_reason":null}]}
+
+data: {"id":"chatcmpl_test","model":"gpt-5-mini","choices":[{"index":0,"delta":{"content":"ok","tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\\\"q\\\":"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl_test","model":"gpt-5-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\\"test\\\"}"}}]},"finish_reason":"tool_calls"}]}
+
+data: {"id":"chatcmpl_test","model":"gpt-5-mini","choices":[],"usage":{"prompt_tokens":12,"prompt_tokens_details":{"cached_tokens":3},"completion_tokens":8,"completion_tokens_details":{"reasoning_tokens":2}}}
+
+data: [DONE]
+

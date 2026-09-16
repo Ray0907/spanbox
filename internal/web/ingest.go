@@ -110,7 +110,7 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if (span.Kind == "llm" || span.Kind == "embedding") && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
-			if cost, ok := deps.Pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens); ok {
+			if cost, ok := deps.Pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, nil); ok {
 				span.CostUSD = &cost
 				span.CostSource = "pricing"
 			}
