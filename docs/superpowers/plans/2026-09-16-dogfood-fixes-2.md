@@ -17,10 +17,10 @@
 - Modify: `internal/web/server_test.go`
 - Modify: `internal/web/static/app.js`
 
-- [ ] Extend the dashboard endpoint test with the 24-hour range assertions and verify RED.
-- [ ] Return `RangeFrom` and `RangeTo` in Unix seconds.
-- [ ] Use the fixed x range and visible six-pixel points on every chart series.
-- [ ] Run focused and full verification, then commit with the required trailer.
+- [x] Extend the dashboard endpoint test with the 24-hour range assertions and verify RED.
+- [x] Return `RangeFrom` and `RangeTo` in Unix seconds.
+- [x] Use the fixed x range and visible six-pixel points on every chart series.
+- [x] Run focused and full verification, then commit with the required trailer.
 
 ### Task 2: Pair GenAI logs across batches
 
@@ -31,10 +31,10 @@
 - Modify: `internal/web/ingest.go`
 - Modify: `internal/web/server_test.go`
 
-- [ ] Add cross-batch storage, response-only, expiry, and bounded-pending tests and verify RED.
-- [ ] Introduce a handler-owned logs adapter with mutex, injected clock, 10-minute expiry, and 1,000-entry cap.
-- [ ] Preserve FIFO matching by resource identity and request model.
-- [ ] Run focused and full verification, then commit with the required trailer.
+- [x] Add cross-batch storage, response-only, expiry, and bounded-pending tests and verify RED.
+- [x] Introduce a handler-owned logs adapter with mutex, injected clock, 10-minute expiry, and 1,000-entry cap.
+- [x] Preserve FIFO matching by resource identity and request model.
+- [x] Run focused and full verification, then commit with the required trailer.
 
 ### Task 3: Add the trace waterfall
 
@@ -48,12 +48,12 @@
 - Refresh: `docs/screenshots/trace.png`
 - Refresh: `docs/screenshots/trace-light.png`
 
-- [ ] Add trace page geometry and start-offset assertions and verify RED.
-- [ ] Return start/end timestamps in tree queries and compute clamped integer offsets/widths against the trace window.
-- [ ] Render the 160px waterfall, time ruler, and span start offset while preserving the narrow layout.
-- [ ] Run the Impeccable detector and browser-check dark/light desktop renders on port 4319.
-- [ ] Populate a port-4319 instance and refresh only the two required screenshots.
-- [ ] Run focused and full verification, then commit with the required trailer.
+- [x] Add trace page geometry and start-offset assertions and verify RED.
+- [x] Return start/end timestamps in tree queries and compute clamped integer offsets/widths against the trace window.
+- [x] Render the 160px waterfall, time ruler, and span start offset while preserving the narrow layout.
+- [x] Run the Impeccable detector and browser-check dark/light desktop renders on port 4319.
+- [x] Populate a port-4319 instance and refresh only the two required screenshots.
+- [x] Run focused and full verification, then commit with the required trailer.
 
 ### Task 4: Record the result
 
@@ -61,5 +61,5 @@
 - Create: `docs/superpowers/specs/2026-09-16-dogfood-fixes-2-result.md`
 - Modify: `docs/superpowers/plans/2026-09-16-dogfood-fixes-2.md`
 
-- [ ] Record changes, verification, and anything skipped.
-- [ ] Mark plan items complete, verify a clean diff, and commit with the required trailer.
+- [x] Record changes, verification, and anything skipped.
+- [x] Mark plan items complete, verify a clean diff, and commit with the required trailer.
