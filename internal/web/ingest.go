@@ -89,7 +89,7 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 	}
 	var rawSpans []otlp.RawSpan
 	if signal == signalLogs {
-		rawSpans, err = otlp.DecodeLogs(body, mediaType, deps.Logf)
+		rawSpans, err = deps.Logs.Decode(body, mediaType, deps.Logf)
 	} else {
 		rawSpans, err = otlp.Decode(body, mediaType)
 	}

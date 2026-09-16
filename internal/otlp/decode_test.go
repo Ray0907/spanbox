@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -181,6 +182,40 @@ func TestGunzipCap(t *testing.T) {
 	}
 }
 
+func splitLogsFixture(t *testing.T) ([]byte, []byte) {
+	t.Helper()
+	jsonBody, err := os.ReadFile("testdata/gemini_cli_logs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request collectorlogspb.ExportLogsServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &request); err != nil {
+		t.Fatal(err)
+	}
+	requestBatch := proto.Clone(&request).(*collectorlogspb.ExportLogsServiceRequest)
+	requestBatch.ResourceLogs[0].ScopeLogs[0].LogRecords = requestBatch.ResourceLogs[0].ScopeLogs[0].LogRecords[:1]
+	responseBatch := proto.Clone(&request).(*collectorlogspb.ExportLogsServiceRequest)
+	responseRecords := responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords
+	responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords = responseRecords[len(responseRecords)-1:]
+	response := responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+	attrs := response.Attributes[:0]
+	for _, attr := range response.Attributes {
+		if attr.Key != "gen_ai.input.messages" && attr.Key != "gen_ai.system_instructions" {
+			attrs = append(attrs, attr)
+		}
+	}
+	response.Attributes = attrs
+	requestBody, err := protojson.Marshal(requestBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responseBody, err := protojson.Marshal(responseBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return requestBody, responseBody
+}
+
 func TestDecodeLogsMergesGenAIRequestAndResponse(t *testing.T) {
 	jsonBody, err := os.ReadFile("testdata/gemini_cli_logs.json")
 	if err != nil {
@@ -195,12 +230,13 @@ func TestDecodeLogsMergesGenAIRequestAndResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	adapter := NewLogsAdapter()
 	var first []RawSpan
 	for _, input := range []struct {
 		body      []byte
 		mediaType string
 	}{{jsonBody, ContentTypeJSON}, {protoBody, ContentTypeProto}, {jsonBody, ContentTypeJSON}} {
-		spans, err := DecodeLogs(input.body, input.mediaType, t.Logf)
+		spans, err := adapter.Decode(input.body, input.mediaType, t.Logf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,5 +262,62 @@ func TestDecodeLogsMergesGenAIRequestAndResponse(t *testing.T) {
 	}
 	if span.Attrs["event.name"] != nil || span.Attrs["spanbox.source"] != "otlp-logs" {
 		t.Fatalf("unexpected adapter attrs: %#v", span.Attrs)
+	}
+}
+
+func TestLogsAdapterPairsAcrossBatches(t *testing.T) {
+	requestBody, responseBody := splitLogsFixture(t)
+	adapter := NewLogsAdapter()
+	if spans, err := adapter.Decode(requestBody, ContentTypeJSON, t.Logf); err != nil || len(spans) != 0 {
+		t.Fatalf("request batch: spans=%d err=%v", len(spans), err)
+	}
+	spans, err := adapter.Decode(responseBody, ContentTypeJSON, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 || spans[0].StartNs != 1789539115130000000 || spans[0].EndNs != 1789539117346000000 || spans[0].Attrs["gen_ai.input.messages"] == nil {
+		t.Fatalf("unpaired span: %#v", spans)
+	}
+}
+
+func TestLogsAdapterStoresResponseWithoutRequest(t *testing.T) {
+	_, responseBody := splitLogsFixture(t)
+	spans, err := NewLogsAdapter().Decode(responseBody, ContentTypeJSON, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 || spans[0].StartNs != spans[0].EndNs {
+		t.Fatalf("response-only span: %#v", spans)
+	}
+}
+
+func TestLogsAdapterCapsPendingRequests(t *testing.T) {
+	requestBody, _ := splitLogsFixture(t)
+	adapter := NewLogsAdapter()
+	for range 1001 {
+		if _, err := adapter.Decode(requestBody, ContentTypeJSON, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if adapter.pendingCount != 1000 {
+		t.Fatalf("pending requests = %d, want 1000", adapter.pendingCount)
+	}
+}
+
+func TestLogsAdapterExpiresPendingRequests(t *testing.T) {
+	requestBody, responseBody := splitLogsFixture(t)
+	now := time.Unix(1_800_000_000, 0)
+	adapter := NewLogsAdapter()
+	adapter.now = func() time.Time { return now }
+	if _, err := adapter.Decode(requestBody, ContentTypeJSON, t.Logf); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(11 * time.Minute)
+	spans, err := adapter.Decode(responseBody, ContentTypeJSON, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 || spans[0].StartNs != spans[0].EndNs {
+		t.Fatalf("expired request was paired: %#v", spans)
 	}
 }

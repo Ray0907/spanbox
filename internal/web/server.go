@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Ray0907/spanbox/internal/config"
+	"github.com/Ray0907/spanbox/internal/otlp"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 )
@@ -19,6 +20,7 @@ type Deps struct {
 	Cfg         config.Config
 	Store       *store.Store
 	Pricing     *pricing.Table
+	Logs        *otlp.LogsAdapter
 	Version     string
 	Logf        func(string, ...any)
 	ingestSlots chan struct{}
@@ -30,6 +32,9 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	if deps.ingestSlots == nil {
 		deps.ingestSlots = make(chan struct{}, config.MaxConcurrentIngest)
+	}
+	if deps.Logs == nil {
+		deps.Logs = otlp.NewLogsAdapter()
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

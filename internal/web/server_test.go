@@ -88,6 +88,37 @@ func logsFixture(t *testing.T) ([]byte, []byte) {
 	return jsonBody, protoBody
 }
 
+func splitLogsFixture(t *testing.T) ([]byte, []byte) {
+	t.Helper()
+	jsonBody, _ := logsFixture(t)
+	var logs collectorlogspb.ExportLogsServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &logs); err != nil {
+		t.Fatal(err)
+	}
+	requestBatch := proto.Clone(&logs).(*collectorlogspb.ExportLogsServiceRequest)
+	requestBatch.ResourceLogs[0].ScopeLogs[0].LogRecords = requestBatch.ResourceLogs[0].ScopeLogs[0].LogRecords[:1]
+	responseBatch := proto.Clone(&logs).(*collectorlogspb.ExportLogsServiceRequest)
+	responseRecords := responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords
+	responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords = responseRecords[len(responseRecords)-1:]
+	response := responseBatch.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+	attrs := response.Attributes[:0]
+	for _, attr := range response.Attributes {
+		if attr.Key != "gen_ai.input.messages" && attr.Key != "gen_ai.system_instructions" {
+			attrs = append(attrs, attr)
+		}
+	}
+	response.Attributes = attrs
+	requestBody, err := protojson.Marshal(requestBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responseBody, err := protojson.Marshal(responseBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return requestBody, responseBody
+}
+
 func request(t *testing.T, handler http.Handler, method, path, contentType, encoding string, body []byte) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, bytes.NewReader(body))
@@ -260,6 +291,30 @@ func TestIngestGenAILogsAndMetrics(t *testing.T) {
 	authed.ServeHTTP(response, req)
 	if response.Code != http.StatusOK {
 		t.Fatalf("authenticated root ingest status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestIngestPairsGenAILogsAcrossBatches(t *testing.T) {
+	handler, database := newTestHandler(t, "")
+	requestBody, responseBody := splitLogsFixture(t)
+	if response := request(t, handler, http.MethodPost, "/v1/logs", "application/json", "", requestBody); response.Code != http.StatusOK {
+		t.Fatalf("request batch status=%d body=%q", response.Code, response.Body.String())
+	}
+	var count int
+	if err := database.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("request batch stored %d spans: %v", count, err)
+	}
+	if response := request(t, handler, http.MethodPost, "/v1/logs", "application/json", "", responseBody); response.Code != http.StatusOK {
+		t.Fatalf("response batch status=%d body=%q", response.Code, response.Body.String())
+	}
+	var startNs, endNs int64
+	var durationMs float64
+	var input string
+	if err := database.Reader().QueryRow("SELECT start_ns, end_ns, duration_ms, input_content FROM spans").Scan(&startNs, &endNs, &durationMs, &input); err != nil {
+		t.Fatal(err)
+	}
+	if startNs != 1789539115130000000 || endNs != 1789539117346000000 || durationMs <= 0 || !strings.Contains(input, "What is two plus two?") {
+		t.Fatalf("stored cross-batch span: start=%d end=%d duration=%g input=%q", startNs, endNs, durationMs, input)
 	}
 }
 
