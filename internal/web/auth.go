@@ -35,6 +35,27 @@ func authenticate(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/proxy/") {
+			provided := r.Header.Get("X-Spanbox-Token")
+			path := r.URL.Path
+			if suffix, ok := strings.CutPrefix(path, "/proxy/t/"); ok {
+				pathToken, rest, found := strings.Cut(suffix, "/")
+				if !found {
+					writeStatus(w, "application/json", http.StatusUnauthorized, 16, "unauthorized")
+					return
+				}
+				provided, path = pathToken, "/proxy/"+rest
+			}
+			if !tokenEqual(provided, token) {
+				writeStatus(w, "application/json", http.StatusUnauthorized, 16, "unauthorized")
+				return
+			}
+			r = r.Clone(r.Context())
+			r.URL.Path = path
+			r.Header.Del("X-Spanbox-Token")
+			next.ServeHTTP(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/v1/") || r.URL.Path == "/" && r.Method == http.MethodPost {
 			provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 			if !ok || !tokenEqual(provided, token) {

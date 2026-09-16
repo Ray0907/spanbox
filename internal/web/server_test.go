@@ -558,6 +558,58 @@ func TestSQLSchemaFailureReturnsServerError(t *testing.T) {
 	}
 }
 
+func TestProxyAuth(t *testing.T) {
+	var upstreamPath, spanboxHeader string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath, spanboxHeader = r.URL.Path, r.Header.Get("X-Spanbox-Token")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	prices, err := pricing.Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(Deps{Cfg: config.Config{AuthToken: "secret", AnthropicUpstream: upstream.URL}, Store: database, Pricing: prices, Version: "test", Logf: t.Logf})
+
+	call := func(path, token string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		if token != "" {
+			req.Header.Set("X-Spanbox-Token", token)
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, req)
+		return response
+	}
+	for _, input := range []struct {
+		name, path, token string
+		want              int
+	}{
+		{"missing", "/proxy/anthropic/v1/models", "", http.StatusUnauthorized},
+		{"wrong", "/proxy/anthropic/v1/models", "wrong", http.StatusUnauthorized},
+		{"header", "/proxy/anthropic/v1/models", "secret", http.StatusOK},
+		{"path", "/proxy/t/secret/anthropic/v1/models", "", http.StatusOK},
+	} {
+		t.Run(input.name, func(t *testing.T) {
+			response := call(input.path, input.token)
+			if response.Code != input.want {
+				t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+			}
+			if input.want == http.StatusUnauthorized && response.Header().Get("Content-Type") != "application/json" {
+				t.Fatalf("content type=%q", response.Header().Get("Content-Type"))
+			}
+		})
+	}
+	if upstreamPath != "/v1/models" || spanboxHeader != "" {
+		t.Fatalf("upstream path=%q spanbox header=%q", upstreamPath, spanboxHeader)
+	}
+}
+
 func TestIngestBearerAuth(t *testing.T) {
 	handler, _ := newTestHandler(t, "secret")
 	jsonBody, _ := traceFixture(t)
