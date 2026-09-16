@@ -1,0 +1,6 @@
+spanbox bundles third-party files:
+
+- internal/pricing/model_prices.json: from BerriAI/litellm (MIT License),
+  https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json
+- internal/web/static/htmx.min.js: htmx (Zero-Clause BSD), https://htmx.org
+- internal/web/static/uPlot.*: uPlot (MIT License), https://github.com/leeoniya/uPlot

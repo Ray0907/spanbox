@@ -2,6 +2,10 @@
 
 spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It accepts OTLP/HTTP protobuf or JSON on port 4318, stores complete span data in embedded SQLite, and serves trace, token, cost, latency, search, and read-only SQL views from the same port—without Postgres, ClickHouse, Redis, or object storage.
 
+## Install
+
+Download a binary from the [releases page](https://github.com/Ray0907/spanbox/releases), or use the container image below. There are no required environment variables; run `./spanbox` and open http://localhost:4318.
+
 ## Run with Docker
 
 Generate a token with at least 32 cryptographically random bytes, then start spanbox:
@@ -77,6 +81,17 @@ sdk.start();
 ```
 
 Enable telemetry on AI SDK calls as documented for the SDK version you use.
+
+### Verified end to end
+
+`examples/otel-python/emit.py` drives the real OpenTelemetry Python SDK (OTLP protobuf, gzip, batch export) against a running spanbox and produces agent, chat, and tool spans with token usage and cache reads:
+
+```sh
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+SPANBOX_URL=http://localhost:4318 AUTH_TOKEN=<token> python examples/otel-python/emit.py 100
+```
+
+On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. If the SDK logs that its queue is full, raise `max_queue_size` on `BatchSpanProcessor`; the default of 2048 drops spans under bursts before they reach spanbox.
 
 ## SQL console security
 
