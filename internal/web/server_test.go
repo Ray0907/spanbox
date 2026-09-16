@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -570,6 +571,43 @@ func TestSQLSchemaFailureReturnsServerError(t *testing.T) {
 	handler.ServeHTTP(response, req)
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestLangfuseNativeAlias(t *testing.T) {
+	handler, database := newTestHandler(t, "secret")
+	jsonBody, _ := traceFixture(t)
+	post := func(auth string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/public/otel/v1/traces", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, req)
+		return response
+	}
+	for _, input := range []struct {
+		auth string
+		want int
+	}{
+		{"", http.StatusUnauthorized},
+		{"Basic " + base64.StdEncoding.EncodeToString([]byte("pk:wrong")), http.StatusUnauthorized},
+		{"Basic " + base64.StdEncoding.EncodeToString([]byte("anything:secret")), http.StatusOK},
+		{"Bearer secret", http.StatusOK},
+	} {
+		if response := post(input.auth); response.Code != input.want {
+			t.Fatalf("auth=%q status=%d body=%q", input.auth, response.Code, response.Body.String())
+		}
+	}
+	var count int
+	if err := database.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil || count != 3 {
+		t.Fatalf("span count=%d err=%v", count, err)
+	}
+	health := request(t, handler, http.MethodGet, "/api/public/health", "", "", nil)
+	if health.Code != http.StatusOK || health.Header().Get("Content-Type") != "application/json" || strings.TrimSpace(health.Body.String()) != `{"status":"OK"}` {
+		t.Fatalf("health status=%d type=%q body=%q", health.Code, health.Header().Get("Content-Type"), health.Body.String())
 	}
 }
 

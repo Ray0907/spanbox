@@ -31,7 +31,7 @@ func authenticate(token string, next http.Handler) http.Handler {
 	}
 	session := sessionValue(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || r.URL.Path == "/login" || strings.HasPrefix(r.URL.Path, "/static/") {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/api/public/health" || r.URL.Path == "/login" || strings.HasPrefix(r.URL.Path, "/static/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -56,9 +56,14 @@ func authenticate(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/v1/") || r.URL.Path == "/" && r.Method == http.MethodPost {
+		if strings.HasPrefix(r.URL.Path, "/v1/") || r.URL.Path == "/api/public/otel/v1/traces" || r.URL.Path == "/" && r.Method == http.MethodPost {
 			provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if !ok || !tokenEqual(provided, token) {
+			valid := ok && tokenEqual(provided, token)
+			if r.URL.Path == "/api/public/otel/v1/traces" && !valid {
+				_, secret, basic := r.BasicAuth()
+				valid = basic && tokenEqual(secret, token)
+			}
+			if !valid {
 				writeStatus(w, responseMediaType(r), http.StatusUnauthorized, 16, "unauthorized")
 				return
 			}

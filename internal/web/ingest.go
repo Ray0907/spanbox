@@ -135,7 +135,7 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 
 func ingestSignal(path, mediaType string, body []byte) (string, error) {
 	switch path {
-	case "/v1/traces":
+	case "/v1/traces", "/api/public/otel/v1/traces":
 		return signalTraces, nil
 	case "/v1/logs":
 		return signalLogs, nil

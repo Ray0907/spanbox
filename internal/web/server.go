@@ -62,6 +62,15 @@ func NewHandler(deps Deps) http.Handler {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		fmt.Fprintln(w, "ok")
 	})
+	mux.HandleFunc("/api/public/health", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"status":"OK"}`)
+	})
+	mux.HandleFunc("/api/public/otel/v1/traces", deps.limitIngest)
 	mux.HandleFunc("/v1/traces", deps.limitIngest)
 	mux.HandleFunc("/v1/logs", deps.limitIngest)
 	mux.HandleFunc("/v1/metrics", deps.limitIngest)

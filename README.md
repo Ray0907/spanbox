@@ -90,7 +90,15 @@ OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>" gemini
 
 ### Langfuse Python SDK (v3 and v4)
 
-Pass spanbox as the SDK's OpenTelemetry exporter. Verified with langfuse 4.15.3: `generation`, `agent`, and `tool` observations, `usage_details` (including `input_cached_tokens`), `cost_details`, and `propagate_attributes(session_id=..., user_id=...)` all map to spanbox columns.
+Point an existing Langfuse app at spanbox with only the standard Langfuse environment variables. The public key is accepted but not used; the secret key must equal `AUTH_TOKEN`.
+
+```sh
+export LANGFUSE_HOST=http://localhost:4318
+export LANGFUSE_SECRET_KEY=<AUTH_TOKEN>
+export LANGFUSE_PUBLIC_KEY=anything
+```
+
+Verified with langfuse 4.15.3: `generation`, `agent`, and `tool` observations, `usage_details` (including `input_cached_tokens`), `cost_details`, and `propagate_attributes(session_id=..., user_id=...)` all map to spanbox columns. A custom exporter remains available when an application needs explicit exporter control:
 
 ```python
 from langfuse import Langfuse
