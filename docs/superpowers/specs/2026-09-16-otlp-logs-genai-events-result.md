@@ -11,7 +11,7 @@
 
 ## Gemini CLI Bearer authentication
 
-Checked the installed Gemini CLI 0.26.0 settings schema, config type, and `@google/gemini-cli-core/dist/src/telemetry/sdk.js`. There is no `otlpHeaders`-equivalent setting, and the HTTP trace, log, and metric exporters are constructed with only `url`. Direct Gemini CLI HTTP telemetry therefore cannot send spanbox's Bearer header today; an OTLP collector or reverse proxy must add it when `AUTH_TOKEN` is enabled.
+Checked the installed Gemini CLI 0.26.0 settings schema, config type, and `@google/gemini-cli-core/dist/src/telemetry/sdk.js`. There is no `otlpHeaders`-equivalent setting, and the HTTP trace, log, and metric exporters are constructed with only `url`. Correction after a live test: the exporters honour `OTEL_EXPORTER_OTLP_HEADERS`, so `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>" gemini` authenticates against spanbox with `AUTH_TOKEN` set (verified 2026-09-16, Gemini CLI 0.26.0: 401 without the variable, spans stored with it).
 
 ## Skipped
 

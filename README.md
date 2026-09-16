@@ -71,7 +71,11 @@ Use these variables with the standard OTLP HTTP exporter and your OpenTelemetry 
 
 Gemini CLI reports model calls as OpenTelemetry GenAI log events. spanbox turns each call into an `llm` span and groups calls into one trace per CLI session; metrics are accepted and discarded. `POST /` detects JSON signals, but treats protobuf as traces; send protobuf logs to `/v1/logs`.
 
-Gemini CLI 0.26.0 HTTP telemetry has no setting equivalent to `otlpHeaders`, and its OTLP exporters are constructed without headers, so it cannot send the Bearer header required by `AUTH_TOKEN` today. Use an OTLP collector or reverse proxy that adds the header when authentication is required.
+Gemini CLI has no `otlpHeaders` setting, but its exporters honour the standard OpenTelemetry environment variable, so with `AUTH_TOKEN` set start the CLI like this (verified with Gemini CLI 0.26.0):
+
+```sh
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>" gemini
+```
 
 ### Langfuse Python SDK (v3 and v4)
 
