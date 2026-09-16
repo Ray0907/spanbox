@@ -41,6 +41,8 @@ func NewHandler(deps Deps) http.Handler {
 		fmt.Fprintln(w, "ok")
 	})
 	mux.HandleFunc("/v1/traces", deps.limitIngest)
+	mux.HandleFunc("/v1/logs", deps.limitIngest)
+	mux.HandleFunc("/v1/metrics", deps.limitIngest)
 	mux.HandleFunc("/login", deps.login)
 	staticFiles, err := fs.Sub(webFiles, "static")
 	if err != nil {
@@ -53,7 +55,13 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("/dashboard", deps.dashboard)
 	mux.HandleFunc("/search", deps.search)
 	mux.HandleFunc("/sql", deps.sqlPage)
-	mux.HandleFunc("/", deps.traces)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			deps.limitIngest(w, r)
+			return
+		}
+		deps.traces(w, r)
+	})
 	return headers(recoverPanics(deps.Logf, authenticate(deps.Cfg.AuthToken, mux)))
 }
 

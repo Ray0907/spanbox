@@ -35,7 +35,7 @@ func authenticate(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/v1/") {
+		if strings.HasPrefix(r.URL.Path, "/v1/") || r.URL.Path == "/" && r.Method == http.MethodPost {
 			provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 			if !ok || !tokenEqual(provided, token) {
 				writeStatus(w, responseMediaType(r), http.StatusUnauthorized, 16, "unauthorized")

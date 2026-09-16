@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
+	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
@@ -60,6 +62,23 @@ func traceFixture(t *testing.T) ([]byte, []byte) {
 	}
 	jsonBody, err = protojson.Marshal(&request)
 	if err != nil {
+		t.Fatal(err)
+	}
+	protoBody, err := proto.Marshal(&request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return jsonBody, protoBody
+}
+
+func logsFixture(t *testing.T) ([]byte, []byte) {
+	t.Helper()
+	jsonBody, err := os.ReadFile("../otlp/testdata/gemini_cli_logs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request collectorlogspb.ExportLogsServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &request); err != nil {
 		t.Fatal(err)
 	}
 	protoBody, err := proto.Marshal(&request)
@@ -183,6 +202,64 @@ func TestIngestEndpoint(t *testing.T) {
 	response = request(t, handler, http.MethodGet, "/healthz", "", "", nil)
 	if response.Code != http.StatusOK || strings.TrimSpace(response.Body.String()) != "ok" {
 		t.Fatalf("health response: %d %q", response.Code, response.Body.String())
+	}
+}
+
+func TestIngestGenAILogsAndMetrics(t *testing.T) {
+	handler, database := newTestHandler(t, "")
+	jsonBody, protoBody := logsFixture(t)
+
+	for _, input := range []struct {
+		path, contentType string
+		body              []byte
+	}{{"/", "application/json", jsonBody}, {"/v1/logs", "application/json", jsonBody}, {"/v1/logs", "application/x-protobuf", protoBody}} {
+		response := request(t, handler, http.MethodPost, input.path, input.contentType, "", input.body)
+		if response.Code != http.StatusOK || response.Header().Get("Content-Type") != input.contentType {
+			t.Fatalf("POST %s (%s): status=%d type=%q body=%q", input.path, input.contentType, response.Code, response.Header().Get("Content-Type"), response.Body.String())
+		}
+	}
+
+	var traceID, kind, provider, requestModel, sessionID string
+	var inputTokens, outputTokens int64
+	var cost sql.NullFloat64
+	if err := database.Reader().QueryRow(`SELECT trace_id, kind, provider, request_model, input_tokens, output_tokens, cost_usd, session_id FROM spans`).Scan(&traceID, &kind, &provider, &requestModel, &inputTokens, &outputTokens, &cost, &sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if kind != "llm" || provider != "gcp.gen_ai" || requestModel != "gemini-3.6-flash" || inputTokens != 9097 || outputTokens != 1 || !cost.Valid || sessionID != "f5c6f2f9-b6a7-4761-a388-73b99a7da85f" {
+		t.Fatalf("unexpected stored span: kind=%q provider=%q model=%q input=%d output=%d cost=%v session=%q", kind, provider, requestModel, inputTokens, outputTokens, cost, sessionID)
+	}
+	response := request(t, handler, http.MethodGet, "/traces/"+traceID, "", "", nil)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "gemini-3.6-flash") || !strings.Contains(response.Body.String(), "What is two plus two?") {
+		t.Fatalf("trace detail status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	metrics := []byte(`{"resourceMetrics":[]}`)
+	metricsBefore := metricsReceived.Load()
+	for _, path := range []string{"/", "/v1/metrics"} {
+		if response := request(t, handler, http.MethodPost, path, "application/json", "", metrics); response.Code != http.StatusOK {
+			t.Fatalf("metrics POST %s: status=%d body=%q", path, response.Code, response.Body.String())
+		}
+	}
+	if got := metricsReceived.Load(); got != metricsBefore+2 {
+		t.Fatalf("metrics counter = %d, want %d", got, metricsBefore+2)
+	}
+	if response := request(t, handler, http.MethodPost, "/", "application/json", "", []byte(`{"unknown":[]}`)); response.Code != http.StatusBadRequest {
+		t.Fatalf("unknown root JSON status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	authed, _ := newTestHandler(t, "secret")
+	for _, path := range []string{"/v1/logs", "/"} {
+		if response := request(t, authed, http.MethodPost, path, "application/json", "", jsonBody); response.Code != http.StatusUnauthorized {
+			t.Fatalf("unauthenticated POST %s status=%d body=%q", path, response.Code, response.Body.String())
+		}
+	}
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer secret")
+	response = httptest.NewRecorder()
+	authed.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("authenticated root ingest status=%d body=%q", response.Code, response.Body.String())
 	}
 }
 

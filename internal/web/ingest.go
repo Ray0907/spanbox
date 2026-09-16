@@ -1,20 +1,37 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/normalize"
 	"github.com/Ray0907/spanbox/internal/otlp"
 	"github.com/Ray0907/spanbox/internal/store"
+	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	collectormetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	signalTraces  = "traces"
+	signalLogs    = "logs"
+	signalMetrics = "metrics"
+)
+
+var (
+	metricsReceived atomic.Uint64
+	metricsLogOnce  sync.Once
 )
 
 func (deps Deps) limitIngest(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +76,23 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 		writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
 		return
 	}
-	rawSpans, err := otlp.Decode(body, mediaType)
+	signal, err := ingestSignal(r.URL.Path, mediaType, body)
+	if err != nil {
+		writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
+		return
+	}
+	if signal == signalMetrics {
+		metricsReceived.Add(1)
+		metricsLogOnce.Do(func() { deps.Logf("metrics received and discarded") })
+		writeExportResponse(w, mediaType, &collectormetricspb.ExportMetricsServiceResponse{})
+		return
+	}
+	var rawSpans []otlp.RawSpan
+	if signal == signalLogs {
+		rawSpans, err = otlp.DecodeLogs(body, mediaType, deps.Logf)
+	} else {
+		rawSpans, err = otlp.Decode(body, mediaType)
+	}
 	if err != nil {
 		writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
 		return
@@ -93,13 +126,48 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	w.Header().Set("Content-Type", mediaType)
-	response := &collectortracepb.ExportTraceServiceResponse{}
+	if signal == signalLogs {
+		writeExportResponse(w, mediaType, &collectorlogspb.ExportLogsServiceResponse{})
+	} else {
+		writeExportResponse(w, mediaType, &collectortracepb.ExportTraceServiceResponse{})
+	}
+}
+
+func ingestSignal(path, mediaType string, body []byte) (string, error) {
+	switch path {
+	case "/v1/traces":
+		return signalTraces, nil
+	case "/v1/logs":
+		return signalLogs, nil
+	case "/v1/metrics":
+		return signalMetrics, nil
+	}
+	if path != "/" {
+		return "", fmt.Errorf("unknown ingest path")
+	}
+	if mediaType == otlp.ContentTypeProto {
+		return signalTraces, nil
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("decode JSON envelope: %w", err)
+	}
+	for key, signal := range map[string]string{"resourceSpans": signalTraces, "resourceLogs": signalLogs, "resourceMetrics": signalMetrics} {
+		if _, ok := envelope[key]; ok {
+			return signal, nil
+		}
+	}
+	return "", fmt.Errorf("unknown OTLP signal")
+}
+
+func writeExportResponse(w http.ResponseWriter, mediaType string, response proto.Message) {
+	var body []byte
 	if mediaType == otlp.ContentTypeProto {
 		body, _ = proto.Marshal(response)
 	} else {
 		body, _ = protojson.Marshal(response)
 	}
+	w.Header().Set("Content-Type", mediaType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
