@@ -329,6 +329,21 @@ func TestTraceFilterRejectsNonFiniteDuration(t *testing.T) {
 	}
 }
 
+func TestBuildTreeKeepsShortSpansVisible(t *testing.T) {
+	spans := []store.Span{
+		{SpanID: "root", StartNs: 1_000, EndNs: 2_000},
+		{SpanID: "child", ParentSpanID: "root", StartNs: 1_500, EndNs: 1_501},
+	}
+	roots := buildTree(spans, 1_000, 2_000)
+	if len(roots) != 1 || len(roots[0].Children) != 1 {
+		t.Fatalf("unexpected tree: %#v", roots)
+	}
+	child := roots[0].Children[0]
+	if child.OffsetPct != 50 || child.WidthPct != 1 {
+		t.Fatalf("child geometry = %d/%d", child.OffsetPct, child.WidthPct)
+	}
+}
+
 func TestTracePages(t *testing.T) {
 	handler, database := newTestHandler(t, "")
 	jsonBody, _ := traceFixture(t)
@@ -348,13 +363,19 @@ func TestTracePages(t *testing.T) {
 	if !strings.Contains(response.Body.String(), `class="kind-row llm"`) {
 		t.Fatalf("trace detail missing kind row marker: %q", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), `style="left:0%;width:100%"`) || !strings.Contains(response.Body.String(), `style="left:17%;width:67%"`) {
+		t.Fatalf("trace detail missing waterfall geometry: %q", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `class="time-ruler"`) || !strings.Contains(response.Body.String(), "300ms") {
+		t.Fatalf("trace detail missing time ruler: %q", response.Body.String())
+	}
 	for _, name := range []string{"agent-root", "chat gpt-4o", "lookup-weather"} {
 		if !strings.Contains(response.Body.String(), name) {
 			t.Fatalf("trace detail missing %q: %q", name, response.Body.String())
 		}
 	}
 	response = request(t, handler, http.MethodGet, "/spans/"+traceID+"/2122232425262728", "", "", nil)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "What is the weather?") || !strings.Contains(response.Body.String(), "100") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "What is the weather?") || !strings.Contains(response.Body.String(), "100") || !strings.Contains(response.Body.String(), "Start offset") || !strings.Contains(response.Body.String(), "+50.0 ms") {
 		t.Fatalf("span detail status=%d body=%q", response.Code, response.Body.String())
 	}
 

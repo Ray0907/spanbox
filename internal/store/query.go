@@ -30,6 +30,7 @@ type TraceRow struct {
 	SessionID    string
 	UserID       string
 	StartNs      int64
+	EndNs        int64
 	DurationMs   float64
 	SpanCount    int
 	LLMCount     int
@@ -40,7 +41,7 @@ type TraceRow struct {
 }
 
 func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow, error) {
-	query := `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, duration_ms,
+	query := `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, end_ns, duration_ms,
 		span_count, llm_count, input_tokens, output_tokens, cost_usd, has_error FROM traces WHERE 1=1`
 	var args []any
 	if filter.FromNs != 0 {
@@ -93,7 +94,7 @@ func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow,
 	for rows.Next() {
 		var row TraceRow
 		if err := rows.Scan(&row.TraceID, &row.Name, &row.ServiceName, &row.Models, &row.SessionID, &row.UserID,
-			&row.StartNs, &row.DurationMs, &row.SpanCount, &row.LLMCount, &row.InputTokens, &row.OutputTokens,
+			&row.StartNs, &row.EndNs, &row.DurationMs, &row.SpanCount, &row.LLMCount, &row.InputTokens, &row.OutputTokens,
 			&row.CostUSD, &row.HasError); err != nil {
 			return nil, err
 		}
@@ -104,10 +105,10 @@ func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow,
 
 func (s *Store) GetTrace(ctx context.Context, traceID string) (TraceRow, []Span, error) {
 	var trace TraceRow
-	err := s.r.QueryRowContext(ctx, `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, duration_ms,
+	err := s.r.QueryRowContext(ctx, `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, end_ns, duration_ms,
 		span_count, llm_count, input_tokens, output_tokens, cost_usd, has_error FROM traces WHERE trace_id=?`, traceID).
 		Scan(&trace.TraceID, &trace.Name, &trace.ServiceName, &trace.Models, &trace.SessionID, &trace.UserID,
-			&trace.StartNs, &trace.DurationMs, &trace.SpanCount, &trace.LLMCount, &trace.InputTokens, &trace.OutputTokens,
+			&trace.StartNs, &trace.EndNs, &trace.DurationMs, &trace.SpanCount, &trace.LLMCount, &trace.InputTokens, &trace.OutputTokens,
 			&trace.CostUSD, &trace.HasError)
 	if err != nil {
 		return TraceRow{}, nil, err
@@ -135,12 +136,12 @@ func (s *Store) GetSpan(ctx context.Context, traceID, spanID string) (Span, erro
 	return scanSpan(s.r.QueryRowContext(ctx, spanSelect+" WHERE trace_id=? AND span_id=?", traceID, spanID))
 }
 
-const spanTreeSelect = `SELECT trace_id, span_id, parent_span_id, name, kind, duration_ms,
+const spanTreeSelect = `SELECT trace_id, span_id, parent_span_id, name, kind, start_ns, end_ns, duration_ms,
 	request_model, response_model, input_tokens, output_tokens FROM spans`
 
 func scanTreeSpan(row scanner) (Span, error) {
 	var span Span
-	err := row.Scan(&span.TraceID, &span.SpanID, &span.ParentSpanID, &span.Name, &span.Kind, &span.DurationMs,
+	err := row.Scan(&span.TraceID, &span.SpanID, &span.ParentSpanID, &span.Name, &span.Kind, &span.StartNs, &span.EndNs, &span.DurationMs,
 		&span.RequestModel, &span.ResponseModel, &span.InputTokens, &span.OutputTokens)
 	return span, err
 }

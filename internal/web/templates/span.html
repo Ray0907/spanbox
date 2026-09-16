@@ -6,6 +6,7 @@
     <div><dt>Tokens</dt><dd>{{tokens .Span.InputTokens}} in / {{tokens .Span.OutputTokens}} out</dd></div>
     <div><dt>Cost</dt><dd>{{money .Span.CostUSD}}</dd></div>
     <div><dt>Duration</dt><dd>{{duration .Span.DurationMs}}</dd></div>
+    <div><dt>Start offset</dt><dd>+{{duration .StartOffsetMs}}</dd></div>
     <div><dt>Status</dt><dd>{{.Status}}</dd></div>
   </dl>
   {{template "contentBlock" .Input}}

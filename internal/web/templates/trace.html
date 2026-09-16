@@ -7,6 +7,7 @@
 <div class="trace-layout">
   <section class="span-tree" aria-label="Span tree">
     <h2>Span tree</h2>
+    <div class="time-ruler" aria-label="Trace timeline">{{range .TimeLabels}}<span>{{.}}</span>{{end}}</div>
     {{range .Roots}}{{template "node" .}}{{end}}
   </section>
   <section id="panel" class="span-panel" aria-live="polite">
@@ -22,7 +23,7 @@
     <span class="tree-model">{{spanModel .Span}}</span>
     <span class="tree-tokens">{{if or .Span.InputTokens .Span.OutputTokens}}{{tokens .Span.InputTokens}} / {{tokens .Span.OutputTokens}}{{end}}</span>
     <span class="tree-duration">{{duration .Span.DurationMs}}</span>
-    <meter min="0" max="100" value="{{.Width}}" aria-label="Relative duration {{.Width}} percent"></meter>
+    <span class="waterfall" aria-label="Starts at {{.OffsetPct}} percent; spans {{.WidthPct}} percent of trace"><span class="waterfall-bar" style="left:{{.OffsetPct}}%;width:{{.WidthPct}}%"></span></span>
   </summary>
   <div class="children">{{range .Children}}{{template "node" .}}{{end}}</div>
 </details>

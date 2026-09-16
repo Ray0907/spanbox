@@ -143,16 +143,18 @@ func cloneValues(values url.Values) url.Values {
 }
 
 type spanNode struct {
-	Span     store.Span
-	Width    int
-	Children []*spanNode
+	Span      store.Span
+	OffsetPct int
+	WidthPct  int
+	Children  []*spanNode
 }
 
 type tracePage struct {
 	layoutData
-	Trace    store.TraceRow
-	Roots    []*spanNode
-	Selected *spanView
+	Trace      store.TraceRow
+	Roots      []*spanNode
+	TimeLabels []string
+	Selected   *spanView
 }
 
 func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
@@ -174,33 +176,38 @@ func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	roots := buildTree(spans)
-	page := tracePage{layoutData: layoutData{Title: trace.Name, Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Trace: trace, Roots: roots}
+	roots := buildTree(spans, trace.StartNs, trace.EndNs)
+	page := tracePage{
+		layoutData: layoutData{Title: trace.Name, Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version},
+		Trace:      trace, Roots: roots, TimeLabels: timeLabels(trace.StartNs, trace.EndNs),
+	}
 	if len(spans) > 0 {
 		selectedSpan, err := deps.Store.GetSpan(r.Context(), traceID, spans[0].SpanID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		selected := newSpanView(selectedSpan)
+		selected := newSpanView(selectedSpan, trace.StartNs)
 		page.Selected = &selected
 	}
 	deps.render(w, "base", page, "templates/base.html", "templates/trace.html", "templates/span.html")
 }
 
-func buildTree(spans []store.Span) []*spanNode {
+func buildTree(spans []store.Span, traceStart, traceEnd int64) []*spanNode {
 	nodes := make(map[string]*spanNode, len(spans))
-	maxDuration := 0.0
+	window := traceEnd - traceStart
 	for _, span := range spans {
-		nodes[span.SpanID] = &spanNode{Span: span}
-		maxDuration = max(maxDuration, span.DurationMs)
+		node := &spanNode{Span: span, WidthPct: 100}
+		if window > 0 {
+			node.OffsetPct = min(max(int(math.Round(float64(span.StartNs-traceStart)*100/float64(window))), 0), 99)
+			node.WidthPct = max(int(math.Round(float64(span.EndNs-span.StartNs)*100/float64(window))), 1)
+			node.WidthPct = min(node.WidthPct, 100-node.OffsetPct)
+		}
+		nodes[span.SpanID] = node
 	}
 	var roots []*spanNode
 	for _, span := range spans {
 		node := nodes[span.SpanID]
-		if maxDuration > 0 {
-			node.Width = int(math.Round(span.DurationMs / maxDuration * 100))
-		}
 		if parent := nodes[span.ParentSpanID]; span.ParentSpanID != "" && parent != nil {
 			parent.Children = append(parent.Children, node)
 		} else {
@@ -208,6 +215,18 @@ func buildTree(spans []store.Span) []*spanNode {
 		}
 	}
 	return roots
+}
+
+func timeLabels(start, end int64) []string {
+	durationMs := max(float64(end-start)/1e6, 0)
+	return []string{"0 ms", compactDuration(durationMs * .25), compactDuration(durationMs * .5), compactDuration(durationMs * .75), compactDuration(durationMs)}
+}
+
+func compactDuration(ms float64) string {
+	if ms >= 1000 {
+		return fmt.Sprintf("%.1fs", ms/1000)
+	}
+	return fmt.Sprintf("%.0fms", ms)
 }
 
 type dashboardPage struct {
@@ -395,7 +414,12 @@ func (deps Deps) span(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	deps.render(w, "span", newSpanView(span), "templates/span.html")
+	trace, _, err := deps.Store.GetTrace(r.Context(), parts[0])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	deps.render(w, "span", newSpanView(span, trace.StartNs), "templates/span.html")
 }
 
 type messageView struct {
@@ -411,14 +435,16 @@ type contentView struct {
 type spanView struct {
 	Span                                       store.Span
 	Status                                     string
+	StartOffsetMs                              float64
 	Input, Output                              contentView
 	Attributes, Events, Links, Resource, Scope string
 }
 
-func newSpanView(span store.Span) spanView {
+func newSpanView(span store.Span, traceStart int64) spanView {
 	status := map[int32]string{0: "Unset", 1: "OK", 2: "Error"}[span.StatusCode]
 	return spanView{
-		Span: span, Status: status, Input: formatContent("Input", span.InputContent), Output: formatContent("Output", span.OutputContent),
+		Span: span, Status: status, StartOffsetMs: max(float64(span.StartNs-traceStart)/1e6, 0),
+		Input: formatContent("Input", span.InputContent), Output: formatContent("Output", span.OutputContent),
 		Attributes: prettyJSON(span.Attributes), Events: prettyJSON(span.Events), Links: prettyJSON(span.Links),
 		Resource: prettyJSON(span.Resource), Scope: prettyJSON(span.Scope),
 	}

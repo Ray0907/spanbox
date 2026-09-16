@@ -483,7 +483,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, var(--surface)
 
 .trace-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 0.88fr) minmax(440px, 1.25fr);
+  grid-template-columns: minmax(540px, 0.95fr) minmax(440px, 1.05fr);
   gap: 14px;
   align-items: start;
 }
@@ -501,9 +501,32 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, var(--surface)
 .span-panel { overflow: hidden; }
 .tree-node { margin: 1px 0; }
 
+.time-ruler {
+  position: relative;
+  width: 160px;
+  height: 20px;
+  margin: 0 6px 5px auto;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: 0.6rem;
+}
+
+.time-ruler span {
+  position: absolute;
+  top: 2px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.time-ruler span:nth-child(1) { left: 0; transform: none; }
+.time-ruler span:nth-child(2) { left: 25%; }
+.time-ruler span:nth-child(3) { left: 50%; }
+.time-ruler span:nth-child(4) { left: 75%; }
+.time-ruler span:nth-child(5) { right: 0; transform: none; }
+
 .tree-node > summary {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) minmax(0, 112px) auto auto 52px;
+  grid-template-columns: 62px minmax(0, 1fr) minmax(0, 112px) auto auto 160px;
   gap: 7px;
   overflow: hidden;
   align-items: center;
@@ -538,11 +561,22 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, var(--surface)
   white-space: nowrap;
 }
 
-.tree-node meter {
-  width: 52px;
-  min-width: 0;
-  height: 6px;
-  accent-color: var(--accent);
+.waterfall {
+  position: relative;
+  display: block;
+  width: 160px;
+  height: 8px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.waterfall-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--kind-color);
 }
 
 .children {
@@ -751,17 +785,26 @@ pre {
 
 @media (max-width: 1200px) {
   .filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
-  .tree-node > summary { grid-template-columns: 62px minmax(0, 1fr) auto auto 52px; }
+  .tree-node > summary { grid-template-columns: 62px minmax(0, 1fr) auto auto 160px; }
   .tree-model { display: none; }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1040px) {
   .trace-layout { grid-template-columns: 1fr; }
   .span-tree { max-height: 55vh; overflow: auto; }
+}
+
+@media (max-width: 980px) {
   .metrics { grid-template-columns: repeat(3, 1fr); }
   .metrics div { border-bottom: 1px solid var(--line); }
   .chart-grid { grid-template-columns: 1fr; }
   .sql-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .tree-node > summary { grid-template-columns: 62px minmax(0, 1fr) minmax(0, 112px) auto auto; }
+  .time-ruler,
+  .waterfall { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -785,8 +828,7 @@ pre {
   .span-panel { margin-top: 12px; }
   .tree-node > summary { grid-template-columns: 58px minmax(100px, 1fr) auto; }
   .tree-model,
-  .tree-tokens,
-  .tree-node meter { display: none; }
+  .tree-tokens { display: none; }
   .metadata { grid-template-columns: repeat(2, 1fr); }
   .span-detail > header { flex-direction: column; }
   .chart-grid article { padding: 9px; }
