@@ -195,4 +195,7 @@ func TestParseErrorStatus(t *testing.T) {
 	if raw.StatusCode != 2 || len(raw.StatusMessage) != 2048 || !strings.Contains(raw.StatusMessage, "rate limited") {
 		t.Fatalf("status=%d message=%q", raw.StatusCode, raw.StatusMessage)
 	}
+	if _, exists := raw.Attrs["gen_ai.usage.input_tokens"]; exists {
+		t.Fatalf("error response has fabricated usage: %#v", raw.Attrs)
+	}
 }

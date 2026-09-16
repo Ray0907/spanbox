@@ -37,6 +37,7 @@ type parsedResponse struct {
 	cacheCreation          int64
 	reasoning              int64
 	outputMessages         any
+	hasUsage               bool
 }
 
 var storedRequestHeaders = map[string]bool{
@@ -96,16 +97,18 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 		}
 		attrs["gen_ai.response.finish_reasons"] = items
 	}
-	attrs["gen_ai.usage.input_tokens"] = response.input
-	attrs["gen_ai.usage.output_tokens"] = response.output
-	if response.cacheRead > 0 || exchange.Vendor == "anthropic" {
-		attrs["gen_ai.usage.cache_read.input_tokens"] = response.cacheRead
-	}
-	if response.cacheCreation > 0 || exchange.Vendor == "anthropic" {
-		attrs["gen_ai.usage.cache_creation.input_tokens"] = response.cacheCreation
-	}
-	if response.reasoning > 0 {
-		attrs["gen_ai.usage.reasoning.output_tokens"] = response.reasoning
+	if response.hasUsage {
+		attrs["gen_ai.usage.input_tokens"] = response.input
+		attrs["gen_ai.usage.output_tokens"] = response.output
+		if response.cacheRead > 0 || exchange.Vendor == "anthropic" {
+			attrs["gen_ai.usage.cache_read.input_tokens"] = response.cacheRead
+		}
+		if response.cacheCreation > 0 || exchange.Vendor == "anthropic" {
+			attrs["gen_ai.usage.cache_creation.input_tokens"] = response.cacheCreation
+		}
+		if response.reasoning > 0 {
+			attrs["gen_ai.usage.reasoning.output_tokens"] = response.reasoning
+		}
 	}
 	if response.outputMessages != nil {
 		attrs["gen_ai.output.messages"] = jsonString(response.outputMessages)
@@ -310,7 +313,9 @@ func parseAnthropicChunks(chunks []map[string]any) parsedResponse {
 		}
 	}
 	content := orderedBlocks(blocks)
-	result.outputMessages = []any{map[string]any{"role": "assistant", "content": content}}
+	if len(content) > 0 {
+		result.outputMessages = []any{map[string]any{"role": "assistant", "content": content}}
+	}
 	return result
 }
 
@@ -350,11 +355,17 @@ func parseAnthropicJSON(object map[string]any) parsedResponse {
 		delete(block, "signature")
 		blocks = append(blocks, block)
 	}
-	result.outputMessages = []any{map[string]any{"role": "assistant", "content": blocks}}
+	if len(blocks) > 0 {
+		result.outputMessages = []any{map[string]any{"role": "assistant", "content": blocks}}
+	}
 	return result
 }
 
 func applyAnthropicUsage(result *parsedResponse, usage map[string]any) {
+	if len(usage) == 0 {
+		return
+	}
+	result.hasUsage = true
 	input, _ := number(usage["input_tokens"])
 	result.cacheRead, _ = number(usage["cache_read_input_tokens"])
 	result.cacheCreation, _ = number(usage["cache_creation_input_tokens"])
@@ -381,13 +392,16 @@ func parseGeminiChunks(chunks []map[string]any) parsedResponse {
 			result.id = id
 		}
 		usage := object(chunk["usageMetadata"])
-		result.input, _ = number(usage["promptTokenCount"])
-		result.cacheRead, _ = number(usage["cachedContentTokenCount"])
-		candidates, _ := number(usage["candidatesTokenCount"])
-		result.reasoning, _ = number(usage["thoughtsTokenCount"])
-		result.output = candidates + result.reasoning
-		if tier := text(usage["serviceTier"]); tier != "" {
-			result.serviceTier = tier
+		if len(usage) > 0 {
+			result.hasUsage = true
+			result.input, _ = number(usage["promptTokenCount"])
+			result.cacheRead, _ = number(usage["cachedContentTokenCount"])
+			candidates, _ := number(usage["candidatesTokenCount"])
+			result.reasoning, _ = number(usage["thoughtsTokenCount"])
+			result.output = candidates + result.reasoning
+			if tier := text(usage["serviceTier"]); tier != "" {
+				result.serviceTier = tier
+			}
 		}
 		for _, candidateValue := range array(chunk["candidates"]) {
 			candidate := objectOf(candidateValue)
@@ -402,7 +416,9 @@ func parseGeminiChunks(chunks []map[string]any) parsedResponse {
 			}
 		}
 	}
-	result.outputMessages = []any{map[string]any{"role": "assistant", "parts": mergeGeminiParts(parts)}}
+	if len(parts) > 0 {
+		result.outputMessages = []any{map[string]any{"role": "assistant", "parts": mergeGeminiParts(parts)}}
+	}
 	return result
 }
 
@@ -429,6 +445,7 @@ func parseOpenAIChunks(chunks []map[string]any) parsedResponse {
 	message := map[string]any{"role": "assistant"}
 	var content strings.Builder
 	tools := map[int]map[string]any{}
+	sawChoice := false
 	for _, chunk := range chunks {
 		if id := text(chunk["id"]); id != "" {
 			result.id = id
@@ -438,6 +455,7 @@ func parseOpenAIChunks(chunks []map[string]any) parsedResponse {
 		}
 		applyOpenAIUsage(&result, object(chunk["usage"]))
 		for _, choiceValue := range array(chunk["choices"]) {
+			sawChoice = true
 			choice := objectOf(choiceValue)
 			addFinish(&result.finishReasons, text(choice["finish_reason"]))
 			delta := object(choice["delta"])
@@ -475,7 +493,9 @@ func parseOpenAIChunks(chunks []map[string]any) parsedResponse {
 		}
 		message["tool_calls"] = values
 	}
-	result.outputMessages = []any{message}
+	if sawChoice {
+		result.outputMessages = []any{message}
+	}
 	return result
 }
 
@@ -493,7 +513,7 @@ func parseOpenAIJSON(object map[string]any) parsedResponse {
 	if output := object["output"]; output != nil {
 		result.outputMessages = output
 		addFinish(&result.finishReasons, text(object["status"]))
-	} else {
+	} else if len(messages) > 0 {
 		result.outputMessages = messages
 	}
 	return result
@@ -511,6 +531,7 @@ func applyOpenAIUsage(result *parsedResponse, usage map[string]any) {
 	if len(usage) == 0 {
 		return
 	}
+	result.hasUsage = true
 	result.input, _ = number(usage["prompt_tokens"])
 	result.output, _ = number(usage["completion_tokens"])
 	result.cacheRead, _ = number(object(usage["prompt_tokens_details"])["cached_tokens"])
@@ -521,6 +542,10 @@ func applyOpenAIUsage(result *parsedResponse, usage map[string]any) {
 }
 
 func applyResponsesUsage(result *parsedResponse, usage map[string]any) {
+	if len(usage) == 0 {
+		return
+	}
+	result.hasUsage = true
 	result.input, _ = number(usage["input_tokens"])
 	result.output, _ = number(usage["output_tokens"])
 	result.cacheRead, _ = number(object(usage["input_tokens_details"])["cached_tokens"])
