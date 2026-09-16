@@ -1,12 +1,17 @@
 package proxy
 
 import (
+	"bufio"
 	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
@@ -108,11 +113,192 @@ func TestInferenceIsStoredAfterRelay(t *testing.T) {
 	}
 }
 
+func TestStreamingRelayFlushesBeforeUpstreamCompletes(t *testing.T) {
+	thirdWritten := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		flusher := w.(http.Flusher)
+		for i := 1; i <= 3; i++ {
+			fmt.Fprintf(w, "data: %d\n\n", i)
+			flusher.Flush()
+			if i < 3 {
+				time.Sleep(200 * time.Millisecond)
+			}
+		}
+		close(thirdWritten)
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	response, err := http.Post(server.URL+"/proxy/openai/v1/chat/completions", "application/json", strings.NewReader(`{"model":"gpt-4o","stream":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	line, err := bufio.NewReader(response.Body).ReadString('\n')
+	if err != nil || line != "data: 1\n" {
+		t.Fatalf("line=%q err=%v", line, err)
+	}
+	select {
+	case <-thirdWritten:
+		t.Fatal("third chunk arrived before client received the first")
+	default:
+	}
+}
+
+func TestClientCancellationCancelsUpstream(t *testing.T) {
+	cancelled := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "data: first\n\n")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+		close(cancelled)
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/proxy/openai/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o","stream":true}`))
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewReader(response.Body)
+	if _, err := reader.ReadString('\n'); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	_ = response.Body.Close()
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("upstream context was not cancelled")
+	}
+}
+
+func TestUpstreamErrorsPassThroughAndStoreSpans(t *testing.T) {
+	tests := []struct {
+		name       string
+		upstream   func() (string, func())
+		wantStatus int
+		wantBody   string
+	}{
+		{"429", func() (string, func()) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				fmt.Fprint(w, `{"error":"rate limited"}`)
+			}))
+			return s.URL, s.Close
+		}, http.StatusTooManyRequests, `{"error":"rate limited"}`},
+		{"unreachable", func() (string, func()) { return "http://127.0.0.1:1", func() {} }, http.StatusBadGateway, "Bad Gateway"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstreamURL, closeUpstream := tt.upstream()
+			defer closeUpstream()
+			database, err := store.Open(t.TempDir() + "/data")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer database.Close()
+			handler, err := New(Config{OpenAIUpstream: upstreamURL, Store: database, Version: "test", Logf: t.Logf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"gpt-5-mini","input":"test"}`)))
+			if response.Code != tt.wantStatus || !strings.Contains(response.Body.String(), tt.wantBody) {
+				t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+			}
+			var status int
+			var message string
+			if err := database.Reader().QueryRow("SELECT status_code,status_message FROM spans").Scan(&status, &message); err != nil {
+				t.Fatal(err)
+			}
+			if status != 2 || !strings.Contains(message, tt.wantBody) {
+				t.Fatalf("stored status=%d message=%q", status, message)
+			}
+		})
+	}
+}
+
+func TestCredentialsAreRelayedButNeverCaptured(t *testing.T) {
+	const secret = "literal-super-secret"
+	var gotAuthorization, gotAPIKey string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization, gotAPIKey = r.Header.Get("Authorization"), r.Header.Get("x-api-key")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture(t, "anthropic_stream.txt"))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var mu sync.Mutex
+	var logs strings.Builder
+	logf := func(format string, args ...any) { mu.Lock(); defer mu.Unlock(); fmt.Fprintf(&logs, format, args...) }
+	handler, err := New(Config{AnthropicUpstream: upstream.URL, Store: database, Version: "test", Logf: logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/proxy/anthropic/v1/messages", bytes.NewReader(fixture(t, "anthropic_request.json")))
+	req.Header.Set("Authorization", "Bearer "+secret)
+	req.Header.Set("x-api-key", secret)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
+	if gotAuthorization != "Bearer "+secret || gotAPIKey != secret {
+		t.Fatalf("credentials not relayed: auth=%q key=%q", gotAuthorization, gotAPIKey)
+	}
+	var attributes, resource, events string
+	if err := database.Reader().QueryRow("SELECT attributes,resource,events FROM spans").Scan(&attributes, &resource, &events); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	capturedLogs := logs.String()
+	mu.Unlock()
+	if strings.Contains(attributes+resource+events+capturedLogs, secret) {
+		t.Fatal("credential was captured")
+	}
+}
+
+func TestUpstreamIdleTimeoutBeforeHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, IdleTimeout: 20 * time.Millisecond, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"test"}`)))
+	if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "upstream idle timeout") {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
 func TestNonInferenceIsCounted(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
 	var log string
-	handler, err := New(Config{GeminiUpstream: upstream.URL, Logf: func(format string, args ...any) { log = format }})
+	handler, err := New(Config{GeminiUpstream: upstream.URL, Store: database, Logf: func(format string, args ...any) { log = format }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,5 +306,9 @@ func TestNonInferenceIsCounted(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/proxy/gemini/v1beta/models", nil))
 	if response.Code != http.StatusOK || !strings.Contains(log, "non-inference proxy request") {
 		t.Fatalf("status=%d log=%q", response.Code, log)
+	}
+	var count int
+	if err := database.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("span count=%d err=%v", count, err)
 	}
 }

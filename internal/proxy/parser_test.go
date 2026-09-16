@@ -112,6 +112,28 @@ func TestParseVendorFixtures(t *testing.T) {
 			if attrs["gen_ai.input.messages"] == "" || attrs["gen_ai.output.messages"] == "" {
 				t.Fatalf("missing content attrs: %#v", attrs)
 			}
+			if raw.Resource["service.version"] == "" || attrs["server.address"] == "" {
+				t.Fatalf("missing service metadata: resource=%#v attrs=%#v", raw.Resource, attrs)
+			}
+			switch tt.name {
+			case "Anthropic stream":
+				attrInt(t, attrs, "gen_ai.usage.cache_creation.input_tokens", 55_784)
+				if attrs["gen_ai.conversation.id"] != "session-test" || attrs["user.id"] != "account-redacted" || attrs["service_tier"] != "standard" || attrs["http.request.header.anthropic-version"] != "2023-06-01" || attrs["gen_ai.system_instructions"] == "" {
+					t.Fatalf("Anthropic attrs=%#v", attrs)
+				}
+			case "Gemini stream":
+				if attrs["user.id"] != "user-redacted" || attrs["gen_ai.response.id"] != "MLWqaoHcGLfZ1e8P-biEeQ" || !strings.Contains(attrs["gen_ai.output.messages"].(string), "proxy ok") {
+					t.Fatalf("Gemini attrs=%#v", attrs)
+				}
+			case "OpenAI chat stream":
+				if attrs["user.id"] != "user-test" || attrs["gen_ai.request.max_tokens"] != int64(100) || attrs["gen_ai.request.temperature"] != 0.2 || !strings.Contains(attrs["gen_ai.output.messages"].(string), "lookup") {
+					t.Fatalf("OpenAI attrs=%#v", attrs)
+				}
+			case "OpenAI responses stream":
+				if !strings.Contains(attrs["gen_ai.system_instructions"].(string), "Be concise") || attrs["gen_ai.response.id"] != "resp_test" {
+					t.Fatalf("Responses attrs=%#v", attrs)
+				}
+			}
 		})
 	}
 }

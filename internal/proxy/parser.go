@@ -612,8 +612,14 @@ func number(value any) (int64, bool) {
 }
 
 func setNumberAttr(attrs map[string]any, key string, value any) {
-	if number, ok := number(value); ok {
-		attrs[key] = number
+	if integer, ok := number(value); ok {
+		attrs[key] = integer
+		return
+	}
+	if value, ok := value.(json.Number); ok {
+		if decimal, err := value.Float64(); err == nil {
+			attrs[key] = decimal
+		}
 	}
 }
 
