@@ -503,7 +503,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, var(--surface)
 
 .tree-node > summary {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) minmax(0, 112px) auto auto 52px;
+  grid-template-columns: 62px minmax(0, 1fr) minmax(0, 112px) auto auto 52px;
   gap: 7px;
   overflow: hidden;
   align-items: center;
@@ -751,7 +751,7 @@ pre {
 
 @media (max-width: 1200px) {
   .filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
-  .tree-node > summary { grid-template-columns: 42px minmax(0, 1fr) auto auto 52px; }
+  .tree-node > summary { grid-template-columns: 62px minmax(0, 1fr) auto auto 52px; }
   .tree-model { display: none; }
 }
 
@@ -779,10 +779,11 @@ pre {
   .search-form input { width: 100%; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .metrics div { border-right: 0; }
+  .metrics div:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .trace-summary { justify-content: flex-start; }
   .trace-layout { display: block; }
   .span-panel { margin-top: 12px; }
-  .tree-node > summary { grid-template-columns: 38px minmax(120px, 1fr) auto; }
+  .tree-node > summary { grid-template-columns: 58px minmax(100px, 1fr) auto; }
   .tree-model,
   .tree-tokens,
   .tree-node meter { display: none; }
