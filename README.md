@@ -43,9 +43,9 @@ export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
 
 Use these variables with the standard OTLP HTTP exporter and your OpenTelemetry instrumentation.
 
-### Langfuse v3 Python SDK
+### Langfuse Python SDK (v3 and v4)
 
-Pass spanbox as the SDK's OpenTelemetry exporter:
+Pass spanbox as the SDK's OpenTelemetry exporter. Verified with langfuse 4.15.3: `generation`, `agent`, and `tool` observations, `usage_details` (including `input_cached_tokens`), `cost_details`, and `propagate_attributes(session_id=..., user_id=...)` all map to spanbox columns.
 
 ```python
 from langfuse import Langfuse
