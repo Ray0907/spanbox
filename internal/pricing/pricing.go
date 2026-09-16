@@ -29,6 +29,7 @@ var providerAliases = map[string]string{
 	"aws.bedrock":        "bedrock",
 	"gcp.vertex_ai":      "vertex_ai",
 	"gcp.gemini":         "gemini",
+	"gcp.gen_ai":         "gemini",
 	"azure.ai.openai":    "azure",
 	"azure.ai.inference": "azure_ai",
 	"mistral_ai":         "mistral",

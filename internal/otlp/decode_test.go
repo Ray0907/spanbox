@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -177,5 +178,53 @@ func TestGunzipCap(t *testing.T) {
 	compressed := gzipBytes(t, make([]byte, 1<<20))
 	if _, err := Gunzip(bytes.NewReader(compressed), 512<<10); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("got %v, want ErrTooLarge", err)
+	}
+}
+
+func TestDecodeLogsMergesGenAIRequestAndResponse(t *testing.T) {
+	jsonBody, err := os.ReadFile("testdata/gemini_cli_logs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request collectorlogspb.ExportLogsServiceRequest
+	if err := protojson.Unmarshal(jsonBody, &request); err != nil {
+		t.Fatal(err)
+	}
+	protoBody, err := proto.Marshal(&request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var first []RawSpan
+	for _, input := range []struct {
+		body      []byte
+		mediaType string
+	}{{jsonBody, ContentTypeJSON}, {protoBody, ContentTypeProto}, {jsonBody, ContentTypeJSON}} {
+		spans, err := DecodeLogs(input.body, input.mediaType, t.Logf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(spans) != 1 {
+			t.Fatalf("got %d spans, want 1", len(spans))
+		}
+		if first == nil {
+			first = spans
+		} else if spans[0].TraceID != first[0].TraceID || spans[0].SpanID != first[0].SpanID {
+			t.Fatalf("IDs are not deterministic: got %s/%s, want %s/%s", spans[0].TraceID, spans[0].SpanID, first[0].TraceID, first[0].SpanID)
+		}
+	}
+
+	span := first[0]
+	if len(span.TraceID) != 32 || len(span.SpanID) != 16 {
+		t.Fatalf("invalid IDs: %q/%q", span.TraceID, span.SpanID)
+	}
+	if span.StartNs != 1789539115130000000 || span.EndNs != 1789539117346000000 {
+		t.Fatalf("times = %d..%d", span.StartNs, span.EndNs)
+	}
+	if span.Attrs["gen_ai.usage.input_tokens"] != int64(9097) || span.Attrs["gen_ai.input.messages"] == nil || span.Attrs["gen_ai.output.messages"] == nil {
+		t.Fatalf("merged attrs missing: %#v", span.Attrs)
+	}
+	if span.Attrs["event.name"] != nil || span.Attrs["spanbox.source"] != "otlp-logs" {
+		t.Fatalf("unexpected adapter attrs: %#v", span.Attrs)
 	}
 }

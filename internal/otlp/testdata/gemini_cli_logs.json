@@ -1,0 +1,331 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "gemini-cli"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "v25.8.0"
+            }
+          },
+          {
+            "key": "session.id",
+            "value": {
+              "stringValue": "f5c6f2f9-b6a7-4761-a388-73b99a7da85f"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "gemini-cli"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1789539115130000000",
+              "observedTimeUnixNano": "1789539115130000000",
+              "body": {
+                "stringValue": "GenAI operation request details from gemini-3.6-flash."
+              },
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "1984411c-25be-44bd-80e8-3a19217b6b61"
+                  }
+                },
+                {
+                  "key": "interactive",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "event.name",
+                  "value": {
+                    "stringValue": "gen_ai.client.inference.operation.details"
+                  }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": {
+                    "stringValue": "2026-09-16T06:11:55.129Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.temperature",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.top_p",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.top_k",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.choice.count",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.seed",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.frequency_penalty",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.presence_penalty",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.max_tokens",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.output.type",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.stop_sequences",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.system_instructions",
+                  "value": {
+                    "stringValue": "[{\"type\":\"text\",\"content\":\"Answer in one short sentence.\"}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "generate_content"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "gcp.gen_ai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gemini-3.6-flash"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "generativelanguage.googleapis.com"
+                  }
+                },
+                {
+                  "key": "server.port",
+                  "value": {
+                    "intValue": 443
+                  }
+                },
+                {
+                  "key": "gen_ai.input.messages",
+                  "value": {
+                    "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"What is two plus two?\"}]}]"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0
+            },
+            {
+              "timeUnixNano": "1789539117345000000",
+              "observedTimeUnixNano": "1789539117345000000",
+              "body": {
+                "stringValue": "API response from gemini-3.6-flash. Status: 200. Duration: 2214ms."
+              },
+              "attributes": [
+                {
+                  "key": "event.name",
+                  "value": {
+                    "stringValue": "gemini_cli.api_response"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0
+            },
+            {
+              "timeUnixNano": "1789539117346000000",
+              "observedTimeUnixNano": "1789539117346000000",
+              "body": {
+                "stringValue": "GenAI operation details from gemini-3.6-flash. Status: 200. Duration: 2214ms."
+              },
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "1984411c-25be-44bd-80e8-3a19217b6b61"
+                  }
+                },
+                {
+                  "key": "interactive",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "event.name",
+                  "value": {
+                    "stringValue": "gen_ai.client.inference.operation.details"
+                  }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": {
+                    "stringValue": "2026-09-16T06:11:57.343Z"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "LDOqas30Dcuy1e8P1vm6-A8"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        },
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.output.messages",
+                  "value": {
+                    "stringValue": "[{\"finish_reason\":\"stop\",\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"4\"}]},{\"finish_reason\":\"stop\",\"role\":\"system\",\"parts\":[{\"type\":\"unknown\",\"text\":\"\",\"thoughtSignature\":\"EqwDCqkDARFNMg+YG+6UPJfiyBWBjX85lVqNLo9zWCOKHS1bU+cJewbVO2Gi1dgxutVhVWrj2AxZFRZ4t5PR3TYK5v2EXMaw58EvtxsMhkd91EQALJ+dLoYGKiO/0YAfIXfwmnNAK8LHRXSveu7jjO1RH0KoxK8Wi8aNXES732jzr+1JVZa8B/q1KQD9kGwxXwElTIkS7rEFHxPF5wNc0/ix5u0D0RXQvYDfEqrmv1oY0aqaQ3KDC8ix8c4m56ChXiP8a4yH43fF6AM5ZcwWsrQYDlgbTsSsfAcYSvQnNG2ysJPer3MMFJIxCxvyIGx823sLh8xlK/O0HJH4gnz4sfqVr+qYGN5gy1cyqxUkThtNrchPdep0pxjbuLx6dQS66rwmjHcM6PCFdNAmgaahUwhh8ozoG7j1iJngXklKYbb1R9evg8DroM+yyJ/qMYvXdBrbK8g1z7Hf0C4E3FniQg0uNM26kUvvL5w2oR2meDRugk++rE1U7ski7AftDGqEeAHwxVSiMdgHsGugX1tEFjgLmotaW3WHLcMOKqTzFOOqQk53jlYwBGATf8KxXUI=\"}]}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.temperature",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.top_p",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.top_k",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.choice.count",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.seed",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.frequency_penalty",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.presence_penalty",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.max_tokens",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.output.type",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.request.stop_sequences",
+                  "value": {}
+                },
+                {
+                  "key": "gen_ai.system_instructions",
+                  "value": {
+                    "stringValue": "[{\"type\":\"text\",\"content\":\"Answer in one short sentence.\"}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "generate_content"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "gcp.gen_ai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gemini-3.6-flash"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "gemini-3.6-flash"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "generativelanguage.googleapis.com"
+                  }
+                },
+                {
+                  "key": "server.port",
+                  "value": {
+                    "intValue": 443
+                  }
+                },
+                {
+                  "key": "gen_ai.input.messages",
+                  "value": {
+                    "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"What is two plus two?\"}]}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": 9097
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": 1
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

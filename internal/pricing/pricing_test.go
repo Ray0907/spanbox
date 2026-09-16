@@ -12,6 +12,7 @@ const testPrices = `{
   "response-model": {"input_cost_per_token": 0.000005, "output_cost_per_token": 0.000006},
   "bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
   "vertex_ai/gemini-1.5-pro": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
+  "gemini/gemini-3.6-flash": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
   "azure/gpt-4o-deployment": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
   "mistral/mistral-large": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
   "no-cache-price": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002},
@@ -51,6 +52,7 @@ func TestCostLookup(t *testing.T) {
 		{name: "strip prefix", request: "openai/gpt-4o"},
 		{name: "Bedrock alias", provider: "aws.bedrock", request: "anthropic.claude-3-5-sonnet-20240620-v1:0"},
 		{name: "Vertex alias", provider: "gcp.vertex_ai", request: "gemini-1.5-pro"},
+		{name: "Gemini alias", provider: "gcp.gen_ai", request: "gemini-3.6-flash"},
 		{name: "Azure alias", provider: "azure.ai.openai", request: "gpt-4o-deployment"},
 		{name: "Mistral alias", provider: "mistral_ai", request: "mistral-large"},
 	}

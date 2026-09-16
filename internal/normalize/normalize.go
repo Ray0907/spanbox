@@ -94,7 +94,13 @@ func Span(raw otlp.RawSpan, logf func(format string, args ...any)) (store.Span, 
 	result.ToolName = firstString(raw.Attrs, logf, toolKeys...)
 	result.ToolCallID = firstString(raw.Attrs, logf, "gen_ai.tool.call.id", "tool.id", "ai.toolCall.id")
 	result.FinishReason = finishReason(raw.Attrs, logf)
-	result.SessionID = firstString(raw.Attrs, logf, "gen_ai.conversation.id", "session.id", "langfuse.session.id", "traceloop.correlation.id")
+	result.SessionID = firstString(raw.Attrs, logf, "gen_ai.conversation.id")
+	if result.SessionID == "" {
+		result.SessionID = firstString(raw.Resource, logf, "session.id")
+	}
+	if result.SessionID == "" {
+		result.SessionID = firstString(raw.Attrs, logf, "session.id", "langfuse.session.id", "traceloop.correlation.id")
+	}
 	result.UserID = firstString(raw.Attrs, logf, "user.id", "langfuse.user.id", "enduser.id", "gen_ai.user", "llm.user")
 	return result, nil
 }
