@@ -16,7 +16,7 @@
     height: 250,
     tzDate: ts => uPlot.tzDate(new Date(ts * 1000), 'UTC'),
     scales: { x: { time: true } },
-    axes: [{ stroke: '#78869a', grid: { stroke: '#d5dde733' } }, { stroke: '#78869a', grid: { stroke: '#d5dde733' } }],
+    axes: [{ stroke: '#78869a', grid: { stroke: '#d5dde733' } }, { stroke: '#78869a', size: 64, grid: { stroke: '#d5dde733' } }],
     series: [{ label: 'UTC day' }, ...series]
   });
 

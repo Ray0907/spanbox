@@ -3,3 +3,4 @@ spanbox
 *.db
 *.db-wal
 *.db-shm
+.gstack/

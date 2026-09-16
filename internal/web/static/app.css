@@ -391,8 +391,9 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 42%, var(--su
 
 .tree-node > summary {
   display: grid;
-  grid-template-columns: auto minmax(120px, 1fr) minmax(70px, auto) auto auto 70px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 120px) auto auto 56px;
   gap: 8px;
+  overflow: hidden;
   align-items: center;
   min-height: 38px;
   padding: 5px 7px;
@@ -413,6 +414,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 42%, var(--su
   white-space: nowrap;
 }
 
+.tree-model { overflow: hidden; text-overflow: ellipsis; }
+
 .tree-model,
 .tree-tokens,
 .tree-duration {
@@ -422,8 +425,14 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 42%, var(--su
   white-space: nowrap;
 }
 
+@media (max-width: 1500px) {
+  .tree-node > summary { grid-template-columns: auto minmax(0, 1fr) auto auto 56px; }
+  .tree-model { display: none; }
+}
+
 .tree-node meter {
-  width: 70px;
+  width: 56px;
+  min-width: 0;
   height: 8px;
   accent-color: var(--accent);
 }

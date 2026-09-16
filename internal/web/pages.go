@@ -461,9 +461,35 @@ func messages(value any) []messageView {
 		if role == "" {
 			role = "message"
 		}
-		result = append(result, messageView{Role: role, Content: textValue(content)})
+		result = append(result, messageView{Role: role, Content: partsText(content)})
 	}
 	return result
+}
+
+// partsText renders OTel GenAI message parts as plain text when every part is
+// a text part; anything else falls back to indented JSON.
+func partsText(content any) string {
+	parts, ok := content.([]any)
+	if !ok || len(parts) == 0 {
+		return textValue(content)
+	}
+	var texts []string
+	for _, part := range parts {
+		object, ok := part.(map[string]any)
+		if !ok {
+			return textValue(content)
+		}
+		kind, _ := object["type"].(string)
+		text, isText := object["content"].(string)
+		if !isText {
+			text, isText = object["text"].(string)
+		}
+		if (kind != "" && kind != "text") || !isText {
+			return textValue(content)
+		}
+		texts = append(texts, text)
+	}
+	return strings.Join(texts, "\n\n")
 }
 
 func textValue(value any) string {

@@ -2,6 +2,16 @@
 
 spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It accepts OTLP/HTTP protobuf or JSON on port 4318, stores complete span data in embedded SQLite, and serves trace, token, cost, latency, search, and read-only SQL views from the same port—without Postgres, ClickHouse, Redis, or object storage.
 
+![Trace detail: span tree with prompt and completion](docs/screenshots/trace.png)
+
+<details>
+<summary>More screenshots: trace list and dashboard</summary>
+
+![Trace list](docs/screenshots/traces.png)
+![Dashboard: cost, tokens, latency percentiles, error rate by day](docs/screenshots/dashboard.png)
+
+</details>
+
 ## Install
 
 Download a binary from the [releases page](https://github.com/Ray0907/spanbox/releases), or use the container image below. There are no required environment variables; run `./spanbox` and open http://localhost:4318.
