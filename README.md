@@ -37,6 +37,9 @@ All configuration is optional.
 | `RETENTION_DAYS` | `30` | Delete complete traces older than this; `0` disables retention |
 | `AUTH_TOKEN` | empty | Bearer token for ingest and login token for the UI |
 | `PRICING_FILE` | empty | Replacement LiteLLM model pricing JSON file |
+| `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Anthropic proxy upstream override |
+| `OPENAI_UPSTREAM` | `https://api.openai.com` | OpenAI proxy upstream override |
+| `GEMINI_UPSTREAM` | `https://generativelanguage.googleapis.com` | Gemini proxy upstream override |
 
 Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled.
 
@@ -50,6 +53,32 @@ docker compose run --rm litestream restore -if-replica-exists -o /data/spanbox.d
 ```
 
 Keep a single writer: never run two spanbox instances against the same restored database file. Restore before spanbox starts because spanbox creates an empty database otherwise, which Litestream could replicate over the good replica; `-if-replica-exists` makes first deployment safe when no backup exists, and automated deployments should enforce restore-before-spanbox with an init container and `depends_on` ordering.
+
+## Capture without instrumentation (proxy)
+
+Point an application's vendor base URL at spanbox to capture prompts, tools, responses, usage, cache tokens, cost, and latency without adding an SDK:
+
+```sh
+export ANTHROPIC_BASE_URL=http://localhost:4318/proxy/anthropic
+export GOOGLE_GEMINI_BASE_URL=http://localhost:4318/proxy/gemini
+export OPENAI_BASE_URL=http://localhost:4318/proxy/openai/v1
+```
+
+When `AUTH_TOKEN` is set, Claude Code can send it as a custom header:
+
+```sh
+export ANTHROPIC_CUSTOM_HEADERS="X-Spanbox-Token: <token>"
+```
+
+Gemini CLI has no custom-header hook, so put the spanbox token in its proxy path instead:
+
+```sh
+export GOOGLE_GEMINI_BASE_URL=http://localhost:4318/proxy/t/<token>/gemini
+```
+
+Vendor credentials pass through unchanged and are never stored. Run the proxy on loopback or set `AUTH_TOKEN`; because spanbox is in the request path, restarting it interrupts in-flight model calls. Custom gateways and regional endpoints can be selected with `ANTHROPIC_UPSTREAM`, `OPENAI_UPSTREAM`, and `GEMINI_UPSTREAM`.
+
+ChatGPT-authenticated Codex does not honor `OPENAI_BASE_URL`; Codex API-key mode does.
 
 ## Export traces
 

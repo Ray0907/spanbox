@@ -21,7 +21,8 @@
 - Prompt management、datasets、playground、evals/scores 寫入
 - gRPC OTLP（OTLP/HTTP logs 僅接受 GenAI operation events；metrics 接受後丟棄）
 - 叢集、S3、Parquet（儲存層走 interface，日後可換，現在不付）
-- 自有 SDK、Langfuse ingestion API 相容
+- 自有 SDK、Langfuse OTLP native path 以外的 ingestion API 相容
+- Proxy 的 embeddings 與其他非 inference 呼叫轉 span（仍會原樣 passthrough）
 - 內容截斷或遮罩（`REDACT` 之類日後再加）
 - 儲存 OTLP span 的 `flags`、dropped counts、scope schema URL
 
@@ -46,10 +47,12 @@
 ## 4. 架構
 
 ```
-OTel SDK ──POST /v1/traces──▶ otlp decode ──▶ normalize ──▶ pricing ──▶ store (SQLite)
-                                                                          ▲
-browser ──GET /,/traces/{id},/dashboard,/search,/sql──▶ web ──────────────┘
-                                                              retention goroutine
+OTel SDK ──POST /v1/traces, /api/public/otel/v1/traces──▶ otlp decode ─┐
+                                                                     │
+LLM client ──/proxy/{anthropic,openai,gemini}──▶ proxy ──▶ vendor    ├─▶ normalize ─▶ pricing ─▶ store (SQLite)
+                                                                     │                              ▲
+browser ──GET /,/sessions,/traces/{id},/dashboard,/search,/sql──▶ web ──────────────────────────────┘
+                                                                                    retention goroutine
 ```
 
 單一 process、單一 `http.Server`、單一 SQLite 檔 `$DATA_DIR/spanbox.db`。
@@ -62,6 +65,7 @@ internal/config              讀 env，給預設值，內含非 env 的常數（
 internal/otlp                解 OTLP proto/JSON 成 []RawSpan（含 gzip、id 驗證、AnyValue 轉換）
 internal/normalize           RawSpan → store.Span：欄位對映 + kind 判定（純函式、table-driven）
 internal/pricing             embed 價格表、provider alias、lookup、算 cost
+internal/proxy               vendor passthrough、stream relay、response parser、RawSpan 合成
 internal/store               SQLite open sequence、migrate、InsertBatch、查詢、retention
 internal/web                 handlers、auth、templates/、static/（htmx、uPlot、css）
 Dockerfile
