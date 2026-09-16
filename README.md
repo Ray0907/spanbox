@@ -80,6 +80,8 @@ Vendor credentials pass through unchanged and are never stored. Run the proxy on
 
 ChatGPT-authenticated Codex does not honor `OPENAI_BASE_URL`; Codex API-key mode does.
 
+Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy sees more (full request and response, cache and thinking tokens), so disable the CLI telemetry when you use it.
+
 ## Export traces
 
 ### Python OpenTelemetry
