@@ -73,6 +73,34 @@ func TestChatGPTRelayUsesCodexResponsesRoute(t *testing.T) {
 	}
 }
 
+func TestChatGPTCompressedRequestIsCaptured(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(fixture(t, "chatgpt_responses_stream.txt"))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler, err := New(Config{ChatGPTUpstream: upstream.URL, Store: database, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/proxy/chatgpt/codex/responses", bytes.NewReader(fixture(t, "chatgpt_request.json.zst")))
+	req.Header.Set("Content-Encoding", "zstd")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
+	var provider, model string
+	var input, output int64
+	if err := database.Reader().QueryRow("SELECT provider,request_model,input_tokens,output_tokens FROM spans").Scan(&provider, &model, &input, &output); err != nil {
+		t.Fatal(err)
+	}
+	if provider != "chatgpt" || model != "gpt-6-astra" || input != 374 || output != 5 {
+		t.Fatalf("provider=%q model=%q input=%d output=%d", provider, model, input, output)
+	}
+}
+
 func TestNamedOpenAICompatibleRelay(t *testing.T) {
 	var path string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -19,6 +19,7 @@ import (
 	"github.com/Ray0907/spanbox/internal/normalize"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
+	"github.com/klauspost/compress/zstd"
 )
 
 const (
@@ -146,62 +147,112 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "unknown proxy route")
 		return
 	}
-	rest = "/" + rest
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	if err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "payload too large")
-		} else {
-			writeError(w, http.StatusBadRequest, "read request body")
-		}
+	body, ok := readProxyBody(w, r)
+	if !ok {
 		return
 	}
+	h.relay(w, r, vendor, route, "/"+rest, endpoint, body, start)
+}
 
+func readProxyBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	if err == nil {
+		return body, true
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		writeError(w, http.StatusRequestEntityTooLarge, "payload too large")
+	} else {
+		writeError(w, http.StatusBadRequest, "read request body")
+	}
+	return nil, false
+}
+
+func newUpstreamRequest(r *http.Request, endpoint endpoint, rest string, body []byte) (*http.Request, error) {
 	target := *endpoint.base
 	target.Path = strings.TrimRight(endpoint.base.Path, "/") + rest
 	target.RawPath = ""
 	target.RawQuery = r.URL.RawQuery
 	upstream, err := http.NewRequestWithContext(r.Context(), r.Method, target.String(), bytes.NewReader(body))
 	if err != nil {
+		return nil, err
+	}
+	headers := r.Header.Clone()
+	headers.Del("X-Spanbox-Token")
+	headers.Del("X-Spanbox-Session")
+	copyHeaders(upstream.Header, headers)
+	upstream.Host = target.Host
+	return upstream, nil
+}
+
+func (h *Handler) relay(w http.ResponseWriter, r *http.Request, vendor, route, rest string, endpoint endpoint, body []byte, start time.Time) {
+	upstream, err := newUpstreamRequest(r, endpoint, rest, body)
+	if err != nil {
 		writeError(w, http.StatusBadGateway, "create upstream request")
 		return
 	}
-	requestHeaders := r.Header.Clone()
-	requestHeaders.Del("X-Spanbox-Token")
-	requestHeaders.Del("X-Spanbox-Session")
-	copyHeaders(upstream.Header, requestHeaders)
-	upstream.Host = target.Host
-
-	inferencePath := rest
-	if strings.HasPrefix(route, "openai-compat/") && !strings.HasPrefix(rest, "/v1/") {
-		inferencePath = "/v1" + rest
-	}
-	inference := isInference(vendor, r.Method, inferencePath)
-	if !inference {
-		count := h.nonInference.Add(1)
-		h.logf("metric: non-inference proxy requests=%d vendor=%s path=%s", count, vendor, rest)
-	}
+	inference, captureBody := h.classifyRequest(vendor, route, rest, r, body)
 	response, err := endpoint.client.Do(upstream)
 	if err != nil {
-		status := http.StatusBadGateway
-		var netErr net.Error
-		if errors.As(err, &netErr) && netErr.Timeout() {
-			status = http.StatusGatewayTimeout
-		}
-		responseBody := errorBody(http.StatusText(status))
-		writeJSON(w, status, responseBody)
-		if inference {
-			h.capture(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
-		}
+		h.writeUpstreamError(w, r, vendor, rest, endpoint, captureBody, start, inference, err)
 		return
 	}
 	defer response.Body.Close()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	streamed := h.stream(w, response, start)
 	if inference {
-		h.capture(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
+		h.capture(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: captureBody, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
 	}
+}
+
+func (h *Handler) classifyRequest(vendor, route, path string, r *http.Request, body []byte) (bool, []byte) {
+	inferencePath := path
+	if strings.HasPrefix(route, "openai-compat/") && !strings.HasPrefix(path, "/v1/") {
+		inferencePath = "/v1" + path
+	}
+	if !isInference(vendor, r.Method, inferencePath) {
+		count := h.nonInference.Add(1)
+		h.logf("metric: non-inference proxy requests=%d vendor=%s path=%s", count, vendor, path)
+		return false, body
+	}
+	decoded, err := decodeRequestBody(r.Header, body)
+	if err != nil {
+		h.logf("decode proxy request: %v", err)
+		return true, body
+	}
+	return true, decoded
+}
+
+func (h *Handler) writeUpstreamError(w http.ResponseWriter, r *http.Request, vendor, path string, endpoint endpoint, body []byte, start time.Time, inference bool, err error) {
+	status := http.StatusBadGateway
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		status = http.StatusGatewayTimeout
+	}
+	responseBody := errorBody(http.StatusText(status))
+	writeJSON(w, status, responseBody)
+	if inference {
+		h.capture(Exchange{Vendor: vendor, Path: path, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
+	}
+}
+
+func decodeRequestBody(headers http.Header, body []byte) ([]byte, error) {
+	if headers.Get("Content-Encoding") != "zstd" {
+		return body, nil
+	}
+	decoder, err := zstd.NewReader(bytes.NewReader(body), zstd.WithDecoderMaxMemory(maxBodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	defer decoder.Close()
+	decoded, err := io.ReadAll(io.LimitReader(decoder, maxBodyBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(decoded) > maxBodyBytes {
+		return nil, fmt.Errorf("decoded body exceeds %d bytes", maxBodyBytes)
+	}
+	return decoded, nil
 }
 
 type readResult struct {

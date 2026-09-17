@@ -1,8 +1,30 @@
 {
-  "model": "gpt-5.3-codex",
-  "instructions": "You are a coding agent.",
+  "model": "gpt-6-astra",
+  "store": false,
+  "stream": true,
+  "instructions": "<redacted>",
   "input": [
-    {"role": "user", "content": [{"type": "input_text", "text": "say ok"}]}
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Reply with exactly: ok"
+        }
+      ]
+    }
   ],
-  "stream": true
+  "text": {
+    "verbosity": "low"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "prompt_cache_key": "<redacted>",
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "reasoning": {
+    "effort": "low",
+    "summary": "auto"
+  }
 }

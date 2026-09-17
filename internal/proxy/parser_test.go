@@ -74,7 +74,7 @@ func TestParseVendorFixtures(t *testing.T) {
 			exchange: Exchange{Vendor: "openai", Path: "/v1/responses", RequestBody: []byte(`{"model":"gpt-5-mini","instructions":"Be concise.","input":[{"role":"user","content":"test"}],"stream":true}`), ResponseBody: fixture(t, "openai_responses_stream.txt"), RequestHeaders: http.Header{"User-Agent": {"codex_cli_rs/1.0"}}, StatusCode: 200, StartNs: 7, EndNs: 8, TTFBMs: 40},
 		},
 		{
-			name: "ChatGPT responses stream", provider: "chatgpt", model: "gpt-5.3-codex", input: 18, output: 5, cache: 2, reason: 1, finish: "completed", service: "pi",
+			name: "ChatGPT responses stream", provider: "chatgpt", model: "gpt-6-astra", input: 374, output: 5, finish: "completed", service: "pi",
 			exchange: Exchange{Vendor: "chatgpt", Path: "/codex/responses", ServerAddress: "chatgpt.com", RequestBody: fixture(t, "chatgpt_request.json"), ResponseBody: fixture(t, "chatgpt_responses_stream.txt"), RequestHeaders: http.Header{"User-Agent": {"pi/0.52.9"}}, StatusCode: 200, StartNs: 9, EndNs: 10, TTFBMs: 50},
 		},
 	}
