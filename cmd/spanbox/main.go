@@ -48,14 +48,15 @@ func main() {
 		go runRetention(database, cfg.RetentionDays)
 	}
 	proxyHandler, err := proxy.New(proxy.Config{
-		AnthropicUpstream: cfg.AnthropicUpstream,
-		OpenAIUpstream:    cfg.OpenAIUpstream,
-		ChatGPTUpstream:   cfg.ChatGPTUpstream,
-		GeminiUpstream:    cfg.GeminiUpstream,
-		Logf:              log.Printf,
-		Store:             database,
-		Pricing:           prices,
-		Version:           version,
+		AnthropicUpstream:     cfg.AnthropicUpstream,
+		OpenAIUpstream:        cfg.OpenAIUpstream,
+		OpenAICompatUpstreams: cfg.OpenAICompatUpstreams,
+		ChatGPTUpstream:       cfg.ChatGPTUpstream,
+		GeminiUpstream:        cfg.GeminiUpstream,
+		Logf:                  log.Printf,
+		Store:                 database,
+		Pricing:               prices,
+		Version:               version,
 	})
 	if err != nil {
 		log.Fatal(err)

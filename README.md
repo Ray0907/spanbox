@@ -39,6 +39,7 @@ All configuration is optional.
 | `PRICING_FILE` | empty | Replacement LiteLLM model pricing JSON file |
 | `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Anthropic proxy upstream override |
 | `OPENAI_UPSTREAM` | `https://api.openai.com` | OpenAI proxy upstream override |
+| `OPENAI_COMPAT_UPSTREAMS` | empty | Named OpenAI-compatible upstreams as `name=url,name2=url2` |
 | `CHATGPT_UPSTREAM` | `https://chatgpt.com/backend-api` | ChatGPT-authenticated Codex proxy upstream override |
 | `GEMINI_UPSTREAM` | `https://generativelanguage.googleapis.com` | Gemini proxy upstream override |
 
@@ -94,6 +95,15 @@ ChatGPT-authenticated Codex uses the `openai-codex` provider. Route it through s
 ```
 
 Codex API-key mode can instead use `OPENAI_BASE_URL=http://localhost:4318/proxy/openai/v1`.
+
+To capture multiple OpenAI-compatible services at once, register lowercase names containing only letters, digits, and hyphens, then route each client through its name:
+
+```sh
+export OPENAI_COMPAT_UPSTREAMS="vllm=http://localhost:18080/v1,local-ai=http://localhost:8080/v1"
+export OPENAI_BASE_URL=http://localhost:4318/proxy/openai-compat/vllm
+```
+
+Named routes reuse OpenAI inference parsing and have the form `/proxy/openai-compat/<name>/...`; `server.address` records that named upstream's host.
 
 Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy sees more (full request and response, cache and thinking tokens), so disable the CLI telemetry when you use it.
 

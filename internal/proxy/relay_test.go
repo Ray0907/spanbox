@@ -73,6 +73,41 @@ func TestChatGPTRelayUsesCodexResponsesRoute(t *testing.T) {
 	}
 }
 
+func TestNamedOpenAICompatibleRelay(t *testing.T) {
+	var path string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_, _ = w.Write(fixture(t, "openai_responses_stream.txt"))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler, err := New(Config{OpenAICompatUpstreams: "local=" + upstream.URL + "/v1", Store: database, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai-compat/local/responses", strings.NewReader(`{"model":"local-model","stream":true}`)))
+	var provider, model, attributes string
+	if err := database.Reader().QueryRow("SELECT provider,request_model,attributes FROM spans").Scan(&provider, &model, &attributes); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || path != "/v1/responses" || provider != "openai" || model != "local-model" || !strings.Contains(attributes, `"server.address":"127.0.0.1"`) {
+		t.Fatalf("status=%d path=%q provider=%q model=%q attrs=%s", response.Code, path, provider, model, attributes)
+	}
+}
+
+func TestNamedOpenAICompatibleRelayRejectsInvalidNames(t *testing.T) {
+	for _, value := range []string{"UPPER=http://localhost", "has_underscore=http://localhost"} {
+		if _, err := New(Config{OpenAICompatUpstreams: value}); err == nil {
+			t.Fatalf("accepted %q", value)
+		}
+	}
+}
+
 func TestRelayRejectsOversizedBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("upstream must not be called")

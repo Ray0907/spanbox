@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -33,15 +34,16 @@ var defaultUpstreams = map[string]string{
 }
 
 type Config struct {
-	AnthropicUpstream string
-	OpenAIUpstream    string
-	ChatGPTUpstream   string
-	GeminiUpstream    string
-	Logf              func(string, ...any)
-	IdleTimeout       time.Duration
-	Store             *store.Store
-	Pricing           *pricing.Table
-	Version           string
+	AnthropicUpstream     string
+	OpenAIUpstream        string
+	OpenAICompatUpstreams string
+	ChatGPTUpstream       string
+	GeminiUpstream        string
+	Logf                  func(string, ...any)
+	IdleTimeout           time.Duration
+	Store                 *store.Store
+	Pricing               *pricing.Table
+	Version               string
 }
 
 type endpoint struct {
@@ -72,29 +74,74 @@ func New(cfg Config) (*Handler, error) {
 		"chatgpt":   cfg.ChatGPTUpstream,
 		"gemini":    cfg.GeminiUpstream,
 	}
+	compat, err := parseOpenAICompatUpstreams(cfg.OpenAICompatUpstreams)
+	if err != nil {
+		return nil, err
+	}
+	for name, value := range compat {
+		values["openai-compat/"+name] = value
+	}
 	h := &Handler{endpoints: make(map[string]endpoint, len(values)), logf: cfg.Logf, idleTimeout: cfg.IdleTimeout, store: cfg.Store, pricing: cfg.Pricing, version: cfg.Version}
-	for vendor, value := range values {
+	for route, value := range values {
 		if value == "" {
-			value = defaultUpstreams[vendor]
+			value = defaultUpstreams[route]
 		}
-		base, err := url.Parse(value)
-		if err != nil || base.Scheme == "" || base.Host == "" {
-			return nil, fmt.Errorf("%s upstream: invalid URL %q", vendor, value)
+		endpoint, err := newEndpoint(value)
+		if err != nil {
+			return nil, fmt.Errorf("%s upstream: %w", route, err)
 		}
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.ResponseHeaderTimeout = 120 * time.Second
-		transport.IdleConnTimeout = 90 * time.Second
-		transport.MaxIdleConnsPerHost = 16
-		transport.DisableCompression = true
-		h.endpoints[vendor] = endpoint{base: base, client: &http.Client{Transport: transport}}
+		h.endpoints[route] = endpoint
 	}
 	return h, nil
 }
 
+func newEndpoint(value string) (endpoint, error) {
+	base, err := url.Parse(value)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return endpoint{}, fmt.Errorf("invalid URL %q", value)
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = 120 * time.Second
+	transport.IdleConnTimeout = 90 * time.Second
+	transport.MaxIdleConnsPerHost = 16
+	transport.DisableCompression = true
+	return endpoint{base: base, client: &http.Client{Transport: transport}}, nil
+}
+
+var openAICompatName = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+func parseOpenAICompatUpstreams(value string) (map[string]string, error) {
+	result := map[string]string{}
+	if value == "" {
+		return result, nil
+	}
+	for _, item := range strings.Split(value, ",") {
+		name, upstream, ok := strings.Cut(item, "=")
+		if !ok || !openAICompatName.MatchString(name) {
+			return nil, fmt.Errorf("OPENAI_COMPAT_UPSTREAMS: invalid entry %q", item)
+		}
+		result[name] = upstream
+	}
+	return result, nil
+}
+
+func proxyRoute(path string) (vendor, route, rest string, ok bool) {
+	vendor, rest, ok = strings.Cut(strings.TrimPrefix(path, "/proxy/"), "/")
+	route = vendor
+	if !ok || vendor != "openai-compat" {
+		return
+	}
+	name, remaining, found := strings.Cut(rest, "/")
+	if !found {
+		return vendor, route, rest, false
+	}
+	return "openai", vendor + "/" + name, remaining, true
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	vendor, rest, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, "/proxy/"), "/")
-	endpoint, exists := h.endpoints[vendor]
+	vendor, route, rest, ok := proxyRoute(r.URL.Path)
+	endpoint, exists := h.endpoints[route]
 	if !ok || !exists || rest == "" {
 		writeError(w, http.StatusNotFound, "unknown proxy route")
 		return
@@ -126,11 +173,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	copyHeaders(upstream.Header, requestHeaders)
 	upstream.Host = target.Host
 
-	if !isInference(vendor, r.Method, rest) {
+	inferencePath := rest
+	if strings.HasPrefix(route, "openai-compat/") && !strings.HasPrefix(rest, "/v1/") {
+		inferencePath = "/v1" + rest
+	}
+	inference := isInference(vendor, r.Method, inferencePath)
+	if !inference {
 		count := h.nonInference.Add(1)
 		h.logf("metric: non-inference proxy requests=%d vendor=%s path=%s", count, vendor, rest)
 	}
-	inference := isInference(vendor, r.Method, rest)
 	response, err := endpoint.client.Do(upstream)
 	if err != nil {
 		status := http.StatusBadGateway
