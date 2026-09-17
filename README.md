@@ -65,11 +65,13 @@ export GOOGLE_GEMINI_BASE_URL=http://localhost:4318/proxy/gemini
 export OPENAI_BASE_URL=http://localhost:4318/proxy/openai/v1
 ```
 
-When `AUTH_TOKEN` is set, Claude Code can send it as a custom header:
+When `AUTH_TOKEN` is set, Claude Code can send it as a custom header. Add the Herdr pane ID in the same shell setting to tag every trace without replacing Claude's conversation ID:
 
 ```sh
-export ANTHROPIC_CUSTOM_HEADERS="X-Spanbox-Token: <token>"
+export ANTHROPIC_CUSTOM_HEADERS="X-Spanbox-Token: <token>,X-Spanbox-Session: $HERDR_PANE_ID"
 ```
+
+Without authentication, use only `export ANTHROPIC_CUSTOM_HEADERS="X-Spanbox-Session: $HERDR_PANE_ID"` in the shell rc. Both spanbox headers are removed before the request is sent upstream.
 
 Gemini CLI has no custom-header hook, so put the spanbox token in its proxy path instead:
 

@@ -248,6 +248,25 @@ func TestUpstreamErrorsPassThroughAndStoreSpans(t *testing.T) {
 	}
 }
 
+func TestSpanboxHeadersAreNotRelayed(t *testing.T) {
+	var token, session string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, session = r.Header.Get("X-Spanbox-Token"), r.Header.Get("X-Spanbox-Session")
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{AnthropicUpstream: upstream.URL, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/proxy/anthropic/v1/messages", strings.NewReader(`{"model":"test"}`))
+	req.Header.Set("X-Spanbox-Token", "secret")
+	req.Header.Set("X-Spanbox-Session", "pane-7")
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if token != "" || session != "" {
+		t.Fatalf("spanbox headers relayed: token=%q session=%q", token, session)
+	}
+}
+
 func TestCredentialsAreRelayedButNeverCaptured(t *testing.T) {
 	const secret = "literal-super-secret"
 	var gotAuthorization, gotAPIKey string

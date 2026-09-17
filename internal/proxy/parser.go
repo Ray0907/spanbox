@@ -48,6 +48,7 @@ var storedRequestHeaders = map[string]bool{
 	"x-goog-api-client":   true,
 	"x-stainless-lang":    true,
 	"openai-organization": true,
+	"x-spanbox-session":   true,
 }
 
 func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
@@ -74,6 +75,9 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 		if storedRequestHeaders[lower] {
 			attrs["http.request.header."+lower] = strings.Join(values, ",")
 		}
+	}
+	if session := exchange.RequestHeaders.Get("X-Spanbox-Session"); session != "" {
+		attrs["spanbox.session"] = session
 	}
 
 	requestModel, sessionID, userID := requestAttributes(exchange, request, attrs)

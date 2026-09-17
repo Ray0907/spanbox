@@ -142,6 +142,17 @@ func TestParseVendorFixtures(t *testing.T) {
 	}
 }
 
+func TestParseStoresSpanboxSessionWithoutReplacingConversation(t *testing.T) {
+	exchange := Exchange{Vendor: "anthropic", Path: "/v1/messages", RequestBody: fixture(t, "anthropic_request.json"), ResponseBody: fixture(t, "anthropic_stream.txt"), RequestHeaders: http.Header{"X-Spanbox-Session": {"pane-7"}}, StatusCode: 200}
+	raw, err := Parse(exchange, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw.Attrs["spanbox.session"] != "pane-7" || raw.Attrs["http.request.header.x-spanbox-session"] != "pane-7" || raw.Attrs["gen_ai.conversation.id"] != "session-test" {
+		t.Fatalf("session attrs: %#v", raw.Attrs)
+	}
+}
+
 func TestParseAnthropicIdentityUsageAndContent(t *testing.T) {
 	exchange := Exchange{Vendor: "anthropic", Path: "/v1/messages", RequestBody: fixture(t, "anthropic_request.json"), ResponseBody: fixture(t, "anthropic_stream.txt"), RequestHeaders: http.Header{"User-Agent": {"claude-cli/2.1.273"}}, StatusCode: 200, StartNs: 10, EndNs: 20}
 	raw, err := Parse(exchange, "test")

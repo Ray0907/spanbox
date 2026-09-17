@@ -120,7 +120,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "create upstream request")
 		return
 	}
-	copyHeaders(upstream.Header, r.Header)
+	requestHeaders := r.Header.Clone()
+	requestHeaders.Del("X-Spanbox-Token")
+	requestHeaders.Del("X-Spanbox-Session")
+	copyHeaders(upstream.Header, requestHeaders)
 	upstream.Host = target.Host
 
 	if !isInference(vendor, r.Method, rest) {
