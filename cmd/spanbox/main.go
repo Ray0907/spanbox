@@ -50,6 +50,7 @@ func main() {
 	proxyHandler, err := proxy.New(proxy.Config{
 		AnthropicUpstream: cfg.AnthropicUpstream,
 		OpenAIUpstream:    cfg.OpenAIUpstream,
+		ChatGPTUpstream:   cfg.ChatGPTUpstream,
 		GeminiUpstream:    cfg.GeminiUpstream,
 		Logf:              log.Printf,
 		Store:             database,

@@ -162,6 +162,8 @@ func providerOperation(vendor string) (string, string) {
 		return "anthropic", "chat"
 	case "gemini":
 		return "gcp.gen_ai", "generate_content"
+	case "chatgpt":
+		return "chatgpt", "chat"
 	default:
 		return "openai", "chat"
 	}
@@ -173,6 +175,8 @@ func defaultServerAddress(vendor string) string {
 		return "api.anthropic.com"
 	case "gemini":
 		return "generativelanguage.googleapis.com"
+	case "chatgpt":
+		return "chatgpt.com"
 	default:
 		return "api.openai.com"
 	}
@@ -203,7 +207,7 @@ func requestAttributes(exchange Exchange, request map[string]any, attrs map[stri
 			setNumberAttr(attrs, "gen_ai.request.max_tokens", generation["maxOutputTokens"])
 			setNumberAttr(attrs, "gen_ai.request.temperature", generation["temperature"])
 		}
-	case "openai":
+	case "openai", "chatgpt":
 		if strings.HasSuffix(exchange.Path, "/responses") {
 			setJSONAttr(attrs, "gen_ai.system_instructions", request["instructions"])
 			setJSONAttr(attrs, "gen_ai.input.messages", request["input"])

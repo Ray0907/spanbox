@@ -55,6 +55,24 @@ func TestRelayPreservesRequestAndStreamsResponse(t *testing.T) {
 	}
 }
 
+func TestChatGPTRelayUsesCodexResponsesRoute(t *testing.T) {
+	var path string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_, _ = w.Write(fixture(t, "chatgpt_responses_stream.txt"))
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{ChatGPTUpstream: upstream.URL, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/chatgpt/codex/responses", bytes.NewReader(fixture(t, "chatgpt_request.json"))))
+	if response.Code != http.StatusOK || path != "/codex/responses" || !isInference("chatgpt", http.MethodPost, path) {
+		t.Fatalf("status=%d path=%q", response.Code, path)
+	}
+}
+
 func TestRelayRejectsOversizedBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("upstream must not be called")

@@ -39,6 +39,7 @@ All configuration is optional.
 | `PRICING_FILE` | empty | Replacement LiteLLM model pricing JSON file |
 | `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Anthropic proxy upstream override |
 | `OPENAI_UPSTREAM` | `https://api.openai.com` | OpenAI proxy upstream override |
+| `CHATGPT_UPSTREAM` | `https://chatgpt.com/backend-api` | ChatGPT-authenticated Codex proxy upstream override |
 | `GEMINI_UPSTREAM` | `https://generativelanguage.googleapis.com` | Gemini proxy upstream override |
 
 Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled.
@@ -76,9 +77,21 @@ Gemini CLI has no custom-header hook, so put the spanbox token in its proxy path
 export GOOGLE_GEMINI_BASE_URL=http://localhost:4318/proxy/t/<token>/gemini
 ```
 
-Vendor credentials pass through unchanged and are never stored. Run the proxy on loopback or set `AUTH_TOKEN`; because spanbox is in the request path, restarting it interrupts in-flight model calls. Custom gateways and regional endpoints can be selected with `ANTHROPIC_UPSTREAM`, `OPENAI_UPSTREAM`, and `GEMINI_UPSTREAM`.
+Vendor credentials pass through unchanged and are never stored. Run the proxy on loopback or set `AUTH_TOKEN`; because spanbox is in the request path, restarting it interrupts in-flight model calls. Custom gateways and regional endpoints can be selected with `ANTHROPIC_UPSTREAM`, `OPENAI_UPSTREAM`, `CHATGPT_UPSTREAM`, and `GEMINI_UPSTREAM`.
 
-ChatGPT-authenticated Codex does not honor `OPENAI_BASE_URL`; Codex API-key mode does.
+ChatGPT-authenticated Codex uses the `openai-codex` provider. Route it through spanbox without changing its OAuth login by merging this provider override into `~/.pi/agent/models.json`:
+
+```json
+{
+  "providers": {
+    "openai-codex": {
+      "baseUrl": "http://localhost:4318/proxy/chatgpt"
+    }
+  }
+}
+```
+
+Codex API-key mode can instead use `OPENAI_BASE_URL=http://localhost:4318/proxy/openai/v1`.
 
 Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy sees more (full request and response, cache and thinking tokens), so disable the CLI telemetry when you use it.
 

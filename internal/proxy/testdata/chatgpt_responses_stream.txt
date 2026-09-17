@@ -1,0 +1,3 @@
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_redacted","status":"completed","model":"gpt-5.3-codex","output":[{"type":"message","id":"msg_redacted","status":"completed","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":18,"input_tokens_details":{"cached_tokens":2},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":1},"total_tokens":23}}}
+

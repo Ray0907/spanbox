@@ -7,7 +7,7 @@ func TestFromEnvDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Port != 4318 || cfg.DataDir != "./data" || cfg.RetentionDays != 30 || cfg.AuthToken != "" || cfg.PricingFile != "" || cfg.AnthropicUpstream != "" || cfg.OpenAIUpstream != "" || cfg.GeminiUpstream != "" {
+	if cfg.Port != 4318 || cfg.DataDir != "./data" || cfg.RetentionDays != 30 || cfg.AuthToken != "" || cfg.PricingFile != "" || cfg.AnthropicUpstream != "" || cfg.OpenAIUpstream != "" || cfg.ChatGPTUpstream != "" || cfg.GeminiUpstream != "" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 }
@@ -21,13 +21,14 @@ func TestFromEnvParsesAllValues(t *testing.T) {
 		"PRICING_FILE":       "/tmp/prices.json",
 		"ANTHROPIC_UPSTREAM": "http://anthropic.test/base",
 		"OPENAI_UPSTREAM":    "http://openai.test/base",
+		"CHATGPT_UPSTREAM":   "http://chatgpt.test/base",
 		"GEMINI_UPSTREAM":    "http://gemini.test/base",
 	}
 	cfg, err := FromEnv(func(key string) string { return values[key] })
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Config{Port: 9000, DataDir: "/tmp/spanbox", RetentionDays: 0, AuthToken: "secret", PricingFile: "/tmp/prices.json", AnthropicUpstream: "http://anthropic.test/base", OpenAIUpstream: "http://openai.test/base", GeminiUpstream: "http://gemini.test/base"}
+	want := Config{Port: 9000, DataDir: "/tmp/spanbox", RetentionDays: 0, AuthToken: "secret", PricingFile: "/tmp/prices.json", AnthropicUpstream: "http://anthropic.test/base", OpenAIUpstream: "http://openai.test/base", ChatGPTUpstream: "http://chatgpt.test/base", GeminiUpstream: "http://gemini.test/base"}
 	if cfg != want {
 		t.Fatalf("got %+v, want %+v", cfg, want)
 	}

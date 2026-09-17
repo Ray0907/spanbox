@@ -1,0 +1,8 @@
+{
+  "model": "gpt-5.3-codex",
+  "instructions": "You are a coding agent.",
+  "input": [
+    {"role": "user", "content": [{"type": "input_text", "text": "say ok"}]}
+  ],
+  "stream": true
+}

@@ -28,12 +28,14 @@ const (
 var defaultUpstreams = map[string]string{
 	"anthropic": "https://api.anthropic.com",
 	"openai":    "https://api.openai.com",
+	"chatgpt":   "https://chatgpt.com/backend-api",
 	"gemini":    "https://generativelanguage.googleapis.com",
 }
 
 type Config struct {
 	AnthropicUpstream string
 	OpenAIUpstream    string
+	ChatGPTUpstream   string
 	GeminiUpstream    string
 	Logf              func(string, ...any)
 	IdleTimeout       time.Duration
@@ -67,6 +69,7 @@ func New(cfg Config) (*Handler, error) {
 	values := map[string]string{
 		"anthropic": cfg.AnthropicUpstream,
 		"openai":    cfg.OpenAIUpstream,
+		"chatgpt":   cfg.ChatGPTUpstream,
 		"gemini":    cfg.GeminiUpstream,
 	}
 	h := &Handler{endpoints: make(map[string]endpoint, len(values)), logf: cfg.Logf, idleTimeout: cfg.IdleTimeout, store: cfg.Store, pricing: cfg.Pricing, version: cfg.Version}
@@ -258,6 +261,8 @@ func isInference(vendor, method, path string) bool {
 		return path == "/v1/messages"
 	case "openai":
 		return path == "/v1/chat/completions" || path == "/v1/responses"
+	case "chatgpt":
+		return path == "/codex/responses"
 	case "gemini":
 		return strings.HasPrefix(path, "/v1beta/models/") && (strings.HasSuffix(path, ":streamGenerateContent") || strings.HasSuffix(path, ":generateContent"))
 	default:

@@ -34,6 +34,7 @@ type Config struct {
 	PricingFile       string
 	AnthropicUpstream string
 	OpenAIUpstream    string
+	ChatGPTUpstream   string
 	GeminiUpstream    string
 }
 
@@ -46,6 +47,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		PricingFile:       getenv("PRICING_FILE"),
 		AnthropicUpstream: getenv("ANTHROPIC_UPSTREAM"),
 		OpenAIUpstream:    getenv("OPENAI_UPSTREAM"),
+		ChatGPTUpstream:   getenv("CHATGPT_UPSTREAM"),
 		GeminiUpstream:    getenv("GEMINI_UPSTREAM"),
 	}
 	if value := getenv("DATA_DIR"); value != "" {
