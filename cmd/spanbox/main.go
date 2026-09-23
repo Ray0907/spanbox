@@ -64,7 +64,9 @@ func main() {
 	server := web.NewServer(web.Deps{Cfg: cfg, Store: database, Pricing: prices, Version: version, Logf: log.Printf, Proxy: proxyHandler})
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		<-shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -73,8 +75,11 @@ func main() {
 		}
 	}()
 	log.Printf("spanbox %s listening on %s", version, server.Addr)
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+	if err := server.ListenAndServe(); err != nil {
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+		<-done
 	}
 }
 

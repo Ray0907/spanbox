@@ -2,6 +2,8 @@ package store
 
 import "context"
 
+var purgeBatchSize = 5000
+
 func (s *Store) Purge(ctx context.Context, cutoffNs int64) (int64, error) {
 	return s.purge(ctx, cutoffNs, func(ctx context.Context) error {
 		_, err := s.w.ExecContext(ctx, "PRAGMA incremental_vacuum(2000)")
@@ -10,12 +12,29 @@ func (s *Store) Purge(ctx context.Context, cutoffNs int64) (int64, error) {
 }
 
 func (s *Store) purge(ctx context.Context, cutoffNs int64, vacuum func(context.Context) error) (int64, error) {
+	var total int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		deleted, err := s.purgeBatch(ctx, cutoffNs)
+		if err != nil {
+			return total, err
+		}
+		total += deleted
+		if deleted == 0 {
+			return total, vacuum(ctx)
+		}
+	}
+}
+
+func (s *Store) purgeBatch(ctx context.Context, cutoffNs int64) (int64, error) {
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "CREATE TEMP TABLE del AS SELECT trace_id FROM traces WHERE start_ns < ?", cutoffNs); err != nil {
+	if _, err := tx.ExecContext(ctx, "CREATE TEMP TABLE del AS SELECT trace_id FROM traces WHERE start_ns < ? LIMIT ?", cutoffNs, purgeBatchSize); err != nil {
 		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM spans WHERE trace_id IN (SELECT trace_id FROM del)"); err != nil {
@@ -35,5 +54,5 @@ func (s *Store) purge(ctx context.Context, cutoffNs int64, vacuum func(context.C
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
-	return deleted, vacuum(ctx)
+	return deleted, nil
 }

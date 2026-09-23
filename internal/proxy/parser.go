@@ -304,6 +304,10 @@ func parseAnthropicChunks(chunks []map[string]any) parsedResponse {
 		case "content_block_delta":
 			index, _ := number(chunk["index"])
 			block := blocks[int(index)]
+			if block == nil {
+				block = map[string]any{}
+				blocks[int(index)] = block
+			}
 			delta := object(chunk["delta"])
 			switch text(delta["type"]) {
 			case "text_delta":

@@ -175,6 +175,19 @@ func TestParseAnthropicIdentityUsageAndContent(t *testing.T) {
 	}
 }
 
+func TestParseAnthropicDeltaWithoutStart(t *testing.T) {
+	result := parseStream("anthropic", []byte("data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n"))
+	messages, ok := result.outputMessages.([]any)
+	if !ok || len(messages) != 1 {
+		t.Fatalf("output messages = %#v", result.outputMessages)
+	}
+	message := messages[0].(map[string]any)
+	content := message["content"].([]any)
+	if len(content) != 1 || content[0].(map[string]any)["text"] != "hello" {
+		t.Fatalf("content = %#v", content)
+	}
+}
+
 func TestParseNonStreamingFixtures(t *testing.T) {
 	request := []byte(strings.Replace(string(fixture(t, "anthropic_request.json")), `"stream": true`, `"stream": false`, 1))
 	tests := []struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -458,6 +459,46 @@ func TestPurgeReportsCommittedDeletesWhenVacuumFails(t *testing.T) {
 	var count int
 	if err := store.Reader().QueryRow("SELECT count(*) FROM traces").Scan(&count); err != nil || count != 0 {
 		t.Fatalf("committed trace count=%d err=%v", count, err)
+	}
+}
+
+func TestPurgeMultipleBatches(t *testing.T) {
+	store := openTestStore(t)
+	previous := purgeBatchSize
+	purgeBatchSize = 2
+	defer func() { purgeBatchSize = previous }()
+
+	var spans []Span
+	for i := 0; i < 5; i++ {
+		spans = append(spans, testSpan(fmt.Sprintf("%032x", i+1), spanID(1), 1, 2))
+	}
+	spans = append(spans, testSpan(fmt.Sprintf("%032x", 6), spanID(1), 10, 11))
+	if err := store.InsertBatch(context.Background(), spans); err != nil {
+		t.Fatal(err)
+	}
+	vacuumCalls := 0
+	deleted, err := store.purge(context.Background(), 5, func(context.Context) error {
+		vacuumCalls++
+		return nil
+	})
+	if err != nil || deleted != 5 || vacuumCalls != 1 {
+		t.Fatalf("deleted=%d vacuumCalls=%d err=%v", deleted, vacuumCalls, err)
+	}
+	var traces, remainingSpans, fts int
+	for _, query := range []struct {
+		sql   string
+		count *int
+	}{
+		{"SELECT count(*) FROM traces", &traces},
+		{"SELECT count(*) FROM spans", &remainingSpans},
+		{"SELECT count(*) FROM spans_fts", &fts},
+	} {
+		if err := store.Reader().QueryRow(query.sql).Scan(query.count); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if traces != 1 || remainingSpans != 1 || fts != 1 {
+		t.Fatalf("traces=%d spans=%d fts=%d", traces, remainingSpans, fts)
 	}
 }
 
