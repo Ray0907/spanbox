@@ -15,6 +15,7 @@ import (
 
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
+	"github.com/klauspost/compress/zstd"
 )
 
 func TestRelayPreservesRequestAndStreamsResponse(t *testing.T) {
@@ -99,6 +100,100 @@ func TestChatGPTCompressedRequestIsCaptured(t *testing.T) {
 	}
 	if provider != "chatgpt" || model != "gpt-6-astra" || input != 374 || output != 5 {
 		t.Fatalf("provider=%q model=%q input=%d output=%d", provider, model, input, output)
+	}
+}
+
+func TestRelayCapturesLargeResponsesCompleted(t *testing.T) {
+	line := `data: {"type":"response.completed","response":{"id":"large-response","model":"gpt-5-mini","status":"completed","usage":{"input_tokens":123,"output_tokens":45},"padding":"` + strings.Repeat("x", 1<<20) + "\"}}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, line)
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, Store: database, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"gpt-5-mini","stream":true}`)))
+	handler.Wait()
+	var input, output *int64
+	if err := database.Reader().QueryRow("SELECT input_tokens, output_tokens FROM spans").Scan(&input, &output); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || input == nil || *input != 123 || output == nil || *output != 45 {
+		t.Fatalf("status=%d usage=%v/%v", response.Code, input, output)
+	}
+}
+
+func TestZstdDecodeAllocations(t *testing.T) {
+	body := fixture(t, "chatgpt_request.json.zst")
+	header := http.Header{"Content-Encoding": {"zstd"}}
+	allocs := testing.AllocsPerRun(10, func() {
+		if _, err := decodeRequestBody(header, body); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs > 10 {
+		t.Fatalf("zstd decode allocations = %g, want <= 10", allocs)
+	}
+}
+
+func TestZstdDecodeRejectsOversizedAndInvalid(t *testing.T) {
+	encoder, err := zstd.NewWriter(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer encoder.Close()
+	header := http.Header{"Content-Encoding": {"zstd"}}
+	oversized := encoder.EncodeAll(bytes.Repeat([]byte("x"), maxBodyBytes+1), nil)
+	if _, err := decodeRequestBody(header, oversized); err == nil {
+		t.Fatal("oversized decoded body accepted")
+	}
+	if _, err := decodeRequestBody(header, []byte("not zstd")); err == nil {
+		t.Fatal("invalid zstd body accepted")
+	}
+}
+
+func TestConcurrentZstdRequests(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(fixture(t, "chatgpt_responses_stream.txt"))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler, err := New(Config{ChatGPTUpstream: upstream.URL, Store: database, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := fixture(t, "chatgpt_request.json.zst")
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/proxy/chatgpt/codex/responses", bytes.NewReader(body))
+			req.Header.Set("Content-Encoding", "zstd")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, req)
+			if response.Code != http.StatusOK {
+				t.Errorf("status=%d", response.Code)
+			}
+		}()
+	}
+	wg.Wait()
+	handler.Wait()
+	var input int64
+	if err := database.Reader().QueryRow("SELECT input_tokens FROM spans").Scan(&input); err != nil || input != 374 {
+		t.Fatalf("stored input=%d err=%v", input, err)
 	}
 }
 

@@ -28,6 +28,14 @@ const (
 	defaultIdleTimeout = 120 * time.Second
 )
 
+var zstdDecoder = func() *zstd.Decoder {
+	decoder, err := zstd.NewReader(nil, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxMemory(maxBodyBytes))
+	if err != nil {
+		panic(err)
+	}
+	return decoder
+}()
+
 var defaultUpstreams = map[string]string{
 	"anthropic": "https://api.anthropic.com",
 	"openai":    "https://api.openai.com",
@@ -243,12 +251,7 @@ func decodeRequestBody(headers http.Header, body []byte) ([]byte, error) {
 	if headers.Get("Content-Encoding") != "zstd" {
 		return body, nil
 	}
-	decoder, err := zstd.NewReader(bytes.NewReader(body), zstd.WithDecoderMaxMemory(maxBodyBytes))
-	if err != nil {
-		return nil, err
-	}
-	defer decoder.Close()
-	decoded, err := io.ReadAll(io.LimitReader(decoder, maxBodyBytes+1))
+	decoded, err := zstdDecoder.DecodeAll(body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +355,9 @@ func (h *Handler) capture(exchange Exchange) {
 	raw, err := Parse(exchange, h.version)
 	if err != nil {
 		h.logf("parse proxy span: %v", err)
-		return
+		if raw.TraceID == "" {
+			return
+		}
 	}
 	span, err := normalize.Span(raw, h.logf)
 	if err != nil {

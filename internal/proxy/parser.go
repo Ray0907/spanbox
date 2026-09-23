@@ -38,6 +38,7 @@ type parsedResponse struct {
 	reasoning              int64
 	outputMessages         any
 	hasUsage               bool
+	scanErr                error
 }
 
 var storedRequestHeaders = map[string]bool{
@@ -157,7 +158,7 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 		StatusCode: statusCode, StatusMessage: statusMessage, Attrs: attrs,
 		Events: []map[string]any{}, Links: []map[string]any{}, Resource: resource,
 		Scope: map[string]any{"name": "spanbox/proxy", "version": version, "attributes": map[string]any{}},
-	}, nil
+	}, response.scanErr
 }
 
 func providerOperation(vendor string) (string, string) {
@@ -253,13 +254,13 @@ func parseResponse(vendor string, stream bool, body []byte) parsedResponse {
 func parseStream(vendor string, body []byte) parsedResponse {
 	var chunks []map[string]any
 	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 64<<10), 1<<20)
+	scanner.Buffer(make([]byte, 64<<10), maxBodyBytes)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data:") {
+		line, ok := bytes.CutPrefix(scanner.Bytes(), []byte("data:"))
+		if !ok {
 			continue
 		}
-		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
+		data := bytes.TrimSpace(line)
 		if bytes.Equal(data, []byte("[DONE]")) {
 			continue
 		}
@@ -267,19 +268,29 @@ func parseStream(vendor string, body []byte) parsedResponse {
 			chunks = append(chunks, object)
 		}
 	}
+	var result parsedResponse
 	switch vendor {
 	case "anthropic":
-		return parseAnthropicChunks(chunks)
+		result = parseAnthropicChunks(chunks)
 	case "gemini":
-		return parseGeminiChunks(chunks)
+		result = parseGeminiChunks(chunks)
 	default:
+		completed := false
 		for _, chunk := range chunks {
 			if text(chunk["type"]) == "response.completed" {
-				return parseResponsesCompleted(chunk)
+				result = parseResponsesCompleted(chunk)
+				completed = true
+				break
 			}
 		}
-		return parseOpenAIChunks(chunks)
+		if !completed {
+			result = parseOpenAIChunks(chunks)
+		}
 	}
+	if err := scanner.Err(); err != nil {
+		result.scanErr = fmt.Errorf("scan proxy stream: %w", err)
+	}
+	return result
 }
 
 func parseAnthropicChunks(chunks []map[string]any) parsedResponse {
