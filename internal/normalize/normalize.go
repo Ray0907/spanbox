@@ -12,11 +12,6 @@ import (
 	"github.com/Ray0907/spanbox/internal/store"
 )
 
-type candidate struct {
-	key   string
-	value any
-}
-
 func Span(raw otlp.RawSpan, logf func(format string, args ...any)) (store.Span, error) {
 	attributes, err := jsonText(raw.Attrs)
 	if err != nil {
