@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -60,6 +61,8 @@ type Handler struct {
 	store        *store.Store
 	pricing      *pricing.Table
 	version      string
+	wg           sync.WaitGroup
+	captureSlots chan struct{}
 }
 
 func New(cfg Config) (*Handler, error) {
@@ -82,7 +85,7 @@ func New(cfg Config) (*Handler, error) {
 	for name, value := range compat {
 		values["openai-compat/"+name] = value
 	}
-	h := &Handler{endpoints: make(map[string]endpoint, len(values)), logf: cfg.Logf, idleTimeout: cfg.IdleTimeout, store: cfg.Store, pricing: cfg.Pricing, version: cfg.Version}
+	h := &Handler{endpoints: make(map[string]endpoint, len(values)), logf: cfg.Logf, idleTimeout: cfg.IdleTimeout, store: cfg.Store, pricing: cfg.Pricing, version: cfg.Version, captureSlots: make(chan struct{}, 8)}
 	for route, value := range values {
 		if value == "" {
 			value = defaultUpstreams[route]
@@ -199,9 +202,9 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, vendor, route, r
 	}
 	defer response.Body.Close()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
-	streamed := h.stream(w, response, start)
+	streamed := h.stream(w, response, start, inference)
 	if inference {
-		h.capture(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: captureBody, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
+		h.captureAsync(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: captureBody, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
 	}
 }
 
@@ -232,7 +235,7 @@ func (h *Handler) writeUpstreamError(w http.ResponseWriter, r *http.Request, ven
 	responseBody := errorBody(http.StatusText(status))
 	writeJSON(w, status, responseBody)
 	if inference {
-		h.capture(Exchange{Vendor: vendor, Path: path, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
+		h.captureAsync(Exchange{Vendor: vendor, Path: path, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
 	}
 }
 
@@ -267,10 +270,11 @@ type streamResult struct {
 	ttfbMs float64
 }
 
-func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start time.Time) streamResult {
+func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start time.Time, inference bool) streamResult {
 	buffer := make([]byte, 32<<10)
 	result := streamResult{status: response.StatusCode, endNs: start.UnixNano()}
 	headersSent := false
+	captureLimitLogged := false
 	for {
 		readCh := make(chan readResult, 1)
 		go func() {
@@ -299,7 +303,13 @@ func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start t
 			headersSent = true
 		}
 		if read.n > 0 {
-			result.body = append(result.body, buffer[:read.n]...)
+			if inference && len(result.body) < maxBodyBytes {
+				result.body = append(result.body, buffer[:min(read.n, maxBodyBytes-len(result.body))]...)
+			}
+			if inference && len(result.body) == maxBodyBytes && !captureLimitLogged {
+				h.logf("proxy response capture truncated at %d bytes", maxBodyBytes)
+				captureLimitLogged = true
+			}
 			if _, err := w.Write(buffer[:read.n]); err != nil {
 				result.endNs = time.Now().UnixNano()
 				return result
@@ -317,6 +327,23 @@ func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start t
 		}
 	}
 }
+
+func (h *Handler) captureAsync(exchange Exchange) {
+	h.captureSlots <- struct{}{}
+	h.wg.Add(1)
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				h.logf("proxy capture panic: %v", recovered)
+			}
+			<-h.captureSlots
+			h.wg.Done()
+		}()
+		h.capture(exchange)
+	}()
+}
+
+func (h *Handler) Wait() { h.wg.Wait() }
 
 func (h *Handler) capture(exchange Exchange) {
 	if h.store == nil {

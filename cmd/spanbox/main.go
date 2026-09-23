@@ -80,6 +80,7 @@ func main() {
 			log.Fatal(err)
 		}
 		<-done
+		proxyHandler.Wait()
 	}
 }
 

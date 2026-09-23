@@ -91,6 +91,7 @@ func TestChatGPTCompressedRequestIsCaptured(t *testing.T) {
 	req.Header.Set("Content-Encoding", "zstd")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, req)
+	handler.Wait()
 	var provider, model string
 	var input, output int64
 	if err := database.Reader().QueryRow("SELECT provider,request_model,input_tokens,output_tokens FROM spans").Scan(&provider, &model, &input, &output); err != nil {
@@ -119,6 +120,7 @@ func TestNamedOpenAICompatibleRelay(t *testing.T) {
 	}
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai-compat/local/responses", strings.NewReader(`{"model":"local-model","stream":true}`)))
+	handler.Wait()
 	var provider, model, attributes string
 	if err := database.Reader().QueryRow("SELECT provider,request_model,attributes FROM spans").Scan(&provider, &model, &attributes); err != nil {
 		t.Fatal(err)
@@ -180,6 +182,7 @@ func TestInferenceIsStoredAfterRelay(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer never-store")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, req)
+	handler.Wait()
 	if response.Code != http.StatusOK || !bytes.Equal(response.Body.Bytes(), responseBody) {
 		t.Fatalf("status=%d", response.Code)
 	}
@@ -296,6 +299,7 @@ func TestUpstreamErrorsPassThroughAndStoreSpans(t *testing.T) {
 			}
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"gpt-5-mini","input":"test"}`)))
+			handler.Wait()
 			if response.Code != tt.wantStatus || !strings.Contains(response.Body.String(), tt.wantBody) {
 				t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
 			}
@@ -356,6 +360,7 @@ func TestCredentialsAreRelayedButNeverCaptured(t *testing.T) {
 	req.Header.Set("x-api-key", secret)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, req)
+	handler.Wait()
 	if gotAuthorization != "Bearer "+secret || gotAPIKey != secret {
 		t.Fatalf("credentials not relayed: auth=%q key=%q", gotAuthorization, gotAPIKey)
 	}
@@ -386,6 +391,35 @@ func TestUpstreamIdleTimeoutBeforeHeaders(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"test"}`)))
 	if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), "upstream idle timeout") {
 		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+func TestCaptureAsyncRecoversPanic(t *testing.T) {
+	var logs []string
+	handler, err := New(Config{Store: &store.Store{}, Logf: func(format string, args ...any) {
+		logs = append(logs, fmt.Sprintf(format, args...))
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.captureAsync(Exchange{Vendor: "openai", Path: "/v1/responses", RequestBody: []byte(`{"model":"test"}`), ResponseBody: []byte(`{"id":"response_1"}`), StatusCode: http.StatusOK, StartNs: 1, EndNs: 2})
+	handler.Wait()
+	if len(logs) != 1 || !strings.Contains(logs[0], "panic") {
+		t.Fatalf("capture logs = %q", logs)
+	}
+}
+
+func TestStreamNonInferenceDoesNotBuffer(t *testing.T) {
+	handler, err := New(Config{Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const body = "file contents"
+	response := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}
+	client := httptest.NewRecorder()
+	result := handler.stream(client, response, time.Now(), false)
+	if client.Body.String() != body || len(result.body) != 0 {
+		t.Fatalf("relayed=%q buffered=%q", client.Body.String(), result.body)
 	}
 }
 
