@@ -1,6 +1,6 @@
 data/
 __pycache__/
-spanbox
+/spanbox
 *.db
 *.db-wal
 *.db-shm
