@@ -1,4 +1,5 @@
 FROM golang:1.26-alpine AS build
+RUN apk add --no-cache ca-certificates
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -7,6 +8,7 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /spanbox ./cmd/spanbox
 
 FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /spanbox /spanbox
 ENV DATA_DIR=/data
 VOLUME /data
