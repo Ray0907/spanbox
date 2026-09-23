@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"math"
 	"mime"
 	"net/http"
@@ -577,41 +576,4 @@ func prettyJSON(value string) string {
 		return output.String()
 	}
 	return value
-}
-
-func (deps Deps) render(w http.ResponseWriter, name string, data any, files ...string) {
-	tmpl, err := template.New("page").Funcs(template.FuncMap{
-		"timeUTC": func(ns int64) string { return time.Unix(0, ns).UTC().Format(time.RFC3339Nano) },
-		"tokens": func(value *int64) string {
-			if value == nil {
-				return "—"
-			}
-			return strconv.FormatInt(*value, 10)
-		},
-		"money": func(value *float64) string {
-			if value == nil {
-				return "—"
-			}
-			return fmt.Sprintf("$%.6f", *value)
-		},
-		"duration": func(ms float64) string { return fmt.Sprintf("%.1f ms", ms) },
-		"percent":  func(value float64) string { return fmt.Sprintf("%.1f%%", value*100) },
-		"elapsed":  func(value time.Duration) string { return value.Round(time.Millisecond).String() },
-		"join":     strings.Join,
-		"spanModel": func(span store.Span) string {
-			if span.ResponseModel != "" {
-				return span.ResponseModel
-			}
-			return span.RequestModel
-		},
-	}).ParseFS(webFiles, files...)
-	if err != nil {
-		deps.Logf("parse templates: %v", err)
-		http.Error(w, "template error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
-		deps.Logf("render template %s: %v", name, err)
-	}
 }

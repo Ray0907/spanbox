@@ -80,7 +80,14 @@ func NewHandler(deps Deps) http.Handler {
 	if err != nil {
 		panic(err)
 	}
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles))))
+	staticHandler := http.FileServer(http.FS(staticFiles))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "htmx.min.js" || path == "uPlot.min.js" || path == "uPlot.min.css" || strings.HasPrefix(path, "fonts/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		staticHandler.ServeHTTP(w, r)
+	})))
 	mux.HandleFunc("/traces/", deps.trace)
 	mux.HandleFunc("/spans/", deps.span)
 	mux.HandleFunc("/sessions", deps.sessions)
