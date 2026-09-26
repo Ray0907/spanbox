@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"math"
 	"mime"
 	"net/http"
@@ -36,10 +37,12 @@ type traceFilterView struct {
 
 type tracesPage struct {
 	layoutData
-	Rows    []store.TraceRow
-	Filter  traceFilterView
-	NextURL string
-	Error   string
+	Rows      []store.TraceRow
+	Filter    traceFilterView
+	NextURL   string
+	ExportURL template.URL
+	Partial   bool
+	Error     string
 }
 
 func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +51,10 @@ func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filter, view, err := traceFilter(r)
-	page := tracesPage{layoutData: layoutData{Title: "Traces", Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view}
+	query := cloneValues(r.URL.Query())
+	query.Del("cursor")
+	query.Del("partial")
+	page := tracesPage{layoutData: layoutData{Title: "Traces", Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view, ExportURL: template.URL("/export?" + query.Encode()), Partial: r.URL.Query().Get("partial") == "1"}
 	if err == nil {
 		page.Rows, err = deps.Store.ListTraces(r.Context(), filter)
 		if len(page.Rows) > 50 {

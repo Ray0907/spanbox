@@ -7,7 +7,7 @@
     </table>
   </div>
   {{if .NextURL}}<nav class="pagination" aria-label="Pagination"><a class="button secondary" href="{{.NextURL}}">Next page</a></nav>{{end}}
-</section>{{end}}
+</section>{{if .Partial}}<a id="export-link" href="{{.ExportURL}}" hx-swap-oob="outerHTML">Export NDJSON</a>{{end}}{{end}}
 {{define "rows"}}<tbody id="trace-rows">
 {{range .Rows}}
 <tr>

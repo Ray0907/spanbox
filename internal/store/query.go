@@ -118,9 +118,8 @@ type TraceRow struct {
 	HasError     bool
 }
 
-func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow, error) {
-	query := `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, end_ns, duration_ms,
-		span_count, llm_count, input_tokens, output_tokens, cost_usd, has_error FROM traces WHERE 1=1`
+func buildTraceWhere(filter TraceFilter) (string, []any) {
+	query := "1=1"
 	var args []any
 	if filter.FromNs != 0 {
 		query += " AND start_ns >= ?"
@@ -154,6 +153,13 @@ func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow,
 		query += " AND user_id = ?"
 		args = append(args, filter.UserID)
 	}
+	return query, args
+}
+
+func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow, error) {
+	where, args := buildTraceWhere(filter)
+	query := `SELECT trace_id, name, service_name, models, session_id, user_id, start_ns, end_ns, duration_ms,
+		span_count, llm_count, input_tokens, output_tokens, cost_usd, has_error FROM traces WHERE ` + where
 	if filter.CursorStartNs != 0 {
 		query += " AND (start_ns, trace_id) < (?, ?)"
 		args = append(args, filter.CursorStartNs, filter.CursorTraceID)

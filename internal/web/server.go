@@ -95,6 +95,8 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("/dashboard", deps.dashboard)
 	mux.HandleFunc("/search", deps.search)
 	mux.HandleFunc("/sql", deps.sqlPage)
+	mux.HandleFunc("/export", deps.exportSpans)
+	mux.HandleFunc("/import", deps.importSpans)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			deps.limitIngest(w, r)

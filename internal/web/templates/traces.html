@@ -4,6 +4,7 @@
     <h1>Traces</h1>
     <p>Requests, model calls, tools, and their full telemetry.</p>
   </div>
+  <a id="export-link" href="{{.ExportURL}}">Export NDJSON</a>
 </section>
 {{if .Error}}<p class="notice error" role="alert">{{.Error}}</p>{{end}}
 <form class="filters" method="get" action="/" hx-get="/?partial=1" hx-target="#trace-results" hx-swap="outerHTML" hx-trigger="change, submit">

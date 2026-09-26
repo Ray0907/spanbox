@@ -70,6 +70,19 @@ func authenticate(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if r.URL.Path == "/export" || r.URL.Path == "/import" {
+			if provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tokenEqual(provided, token) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			cookie, err := r.Cookie("spanbox_session")
+			if err != nil || !tokenEqual(cookie.Value, session) {
+				writeStatus(w, responseMediaType(r), http.StatusUnauthorized, 16, "unauthorized")
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		cookie, err := r.Cookie("spanbox_session")
 		if err != nil || !tokenEqual(cookie.Value, session) {
 			http.Redirect(w, r, "/login", http.StatusFound)
