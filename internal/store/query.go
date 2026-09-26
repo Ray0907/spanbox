@@ -131,8 +131,9 @@ func (s *Store) ListTraces(ctx context.Context, filter TraceFilter) ([]TraceRow,
 		args = append(args, filter.ToNs)
 	}
 	if filter.Model != "" {
-		query += " AND models LIKE ?"
-		args = append(args, "%"+filter.Model+"%")
+		query += ` AND trace_id IN (SELECT trace_id FROM spans WHERE request_model LIKE ? OR response_model LIKE ?)`
+		like := "%" + filter.Model + "%"
+		args = append(args, like, like)
 	}
 	if filter.Service != "" {
 		query += " AND service_name LIKE ?"
