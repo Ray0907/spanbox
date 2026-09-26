@@ -274,24 +274,22 @@ type ModelRow struct {
 
 func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardData, error) {
 	data := DashboardData{RangeFrom: fromNs / 1e9, RangeTo: toNs / 1e9}
-	err := s.r.QueryRowContext(ctx, `SELECT count(*), SUM(cost_usd), SUM(input_tokens), SUM(output_tokens),
-		COALESCE(AVG(has_error), 0) FROM traces WHERE start_ns >= ? AND (? = 0 OR start_ns < ?)`, fromNs, toNs, toNs).
-		Scan(&data.TraceCount, &data.TotalCost, &data.TotalInput, &data.TotalOutput, &data.ErrorRate)
-	if err != nil {
-		return DashboardData{}, err
-	}
 	rows, err := s.r.QueryContext(ctx, `SELECT strftime('%Y-%m-%d', start_ns/1e9, 'unixepoch') AS day,
-		SUM(cost_usd), SUM(input_tokens), SUM(output_tokens), AVG(has_error)
+		count(*), SUM(cost_usd), SUM(input_tokens), SUM(output_tokens), AVG(has_error)
 		FROM traces WHERE start_ns >= ? AND (? = 0 OR start_ns < ?) GROUP BY day ORDER BY day`, fromNs, toNs, toNs)
 	if err != nil {
 		return DashboardData{}, err
 	}
+	var totalCost, totalInput, totalOutput sql.NullFloat64
+	var totalCount int64
+	var errorSum float64
 	for rows.Next() {
 		var day string
+		var count int64
 		var cost sql.NullFloat64
 		var input, output sql.NullInt64
 		var errorRate float64
-		if err := rows.Scan(&day, &cost, &input, &output, &errorRate); err != nil {
+		if err := rows.Scan(&day, &count, &cost, &input, &output, &errorRate); err != nil {
 			rows.Close()
 			return DashboardData{}, err
 		}
@@ -300,12 +298,38 @@ func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardDat
 		data.DailyInput = append(data.DailyInput, nullableInt(input))
 		data.DailyOutput = append(data.DailyOutput, nullableInt(output))
 		data.DailyErrorRate = append(data.DailyErrorRate, errorRate)
+		totalCount += count
+		errorSum += errorRate * float64(count)
+		if cost.Valid {
+			totalCost.Valid, totalCost.Float64 = true, totalCost.Float64+cost.Float64
+		}
+		if input.Valid {
+			totalInput.Valid, totalInput.Float64 = true, totalInput.Float64+float64(input.Int64)
+		}
+		if output.Valid {
+			totalOutput.Valid, totalOutput.Float64 = true, totalOutput.Float64+float64(output.Int64)
+		}
 	}
 	if err := rows.Close(); err != nil {
 		return DashboardData{}, err
 	}
 	if err := rows.Err(); err != nil {
 		return DashboardData{}, err
+	}
+	data.TraceCount = totalCount
+	if totalCost.Valid {
+		data.TotalCost = &totalCost.Float64
+	}
+	if totalInput.Valid {
+		v := int64(totalInput.Float64)
+		data.TotalInput = &v
+	}
+	if totalOutput.Valid {
+		v := int64(totalOutput.Float64)
+		data.TotalOutput = &v
+	}
+	if totalCount > 0 {
+		data.ErrorRate = errorSum / float64(totalCount)
 	}
 
 	percentiles, err := s.dashboardPercentiles(ctx, fromNs, toNs)
