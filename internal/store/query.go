@@ -54,22 +54,14 @@ func (s *Store) ListSessions(ctx context.Context, filter SessionFilter) ([]Sessi
 		selected += " AND start_ns < ?"
 		args = append(args, filter.ToNs)
 	}
-	query := `WITH selected AS (` + selected + `), model_rows AS (
-		SELECT s.session_id, COALESCE(NULLIF(sp.response_model,''), sp.request_model) AS model, MIN(sp.start_ns) AS first_ns
-		FROM selected s JOIN spans sp ON sp.trace_id=s.trace_id
-		WHERE COALESCE(NULLIF(sp.response_model,''), sp.request_model)<>'' GROUP BY s.session_id, model
-	), models AS (
-		SELECT session_id, group_concat(model, ',') AS names FROM
-		(SELECT * FROM model_rows ORDER BY session_id, first_ns, model) GROUP BY session_id
-	)
-	SELECT s.session_id,
-		(SELECT service_name FROM selected x WHERE x.session_id=s.session_id ORDER BY start_ns, trace_id LIMIT 1),
-		MIN(s.start_ns), MAX(s.end_ns), COUNT(*), SUM(s.llm_count),
-		CASE WHEN SUM(s.input_tokens IS NULL)>0 THEN NULL ELSE SUM(s.input_tokens) END,
-		CASE WHEN SUM(s.output_tokens IS NULL)>0 THEN NULL ELSE SUM(s.output_tokens) END,
-		CASE WHEN SUM(s.cost_usd IS NULL)>0 THEN NULL ELSE SUM(s.cost_usd) END,
-		COALESCE(m.names,'')
-	FROM selected s LEFT JOIN models m ON m.session_id=s.session_id GROUP BY s.session_id`
+	query := `WITH selected AS (` + selected + `), page AS (
+		SELECT s.session_id,
+			(SELECT service_name FROM selected x WHERE x.session_id=s.session_id ORDER BY start_ns, trace_id LIMIT 1) AS service_name,
+			MIN(s.start_ns) AS first_ns, MAX(s.end_ns) AS last_ns, COUNT(*) AS trace_count, SUM(s.llm_count) AS llm_count,
+			CASE WHEN SUM(s.input_tokens IS NULL)>0 THEN NULL ELSE SUM(s.input_tokens) END AS input_tokens,
+			CASE WHEN SUM(s.output_tokens IS NULL)>0 THEN NULL ELSE SUM(s.output_tokens) END AS output_tokens,
+			CASE WHEN SUM(s.cost_usd IS NULL)>0 THEN NULL ELSE SUM(s.cost_usd) END AS cost_usd
+		FROM selected s GROUP BY s.session_id`
 	if filter.CursorLastNs != 0 {
 		query += " HAVING (MAX(s.end_ns), s.session_id) < (?, ?)"
 		args = append(args, filter.CursorLastNs, filter.CursorSessionID)
@@ -78,7 +70,19 @@ func (s *Store) ListSessions(ctx context.Context, filter SessionFilter) ([]Sessi
 	if limit <= 0 {
 		limit = 100
 	}
-	query += " ORDER BY MAX(s.end_ns) DESC, s.session_id DESC LIMIT ?"
+	query += ` ORDER BY MAX(s.end_ns) DESC, s.session_id DESC LIMIT ?
+	), model_rows AS (
+		SELECT s.session_id, COALESCE(NULLIF(sp.response_model,''), sp.request_model) AS model, MIN(sp.start_ns) AS first_ns
+		FROM page p CROSS JOIN selected s ON s.session_id=p.session_id JOIN spans sp ON sp.trace_id=s.trace_id
+		WHERE COALESCE(NULLIF(sp.response_model,''), sp.request_model)<>'' GROUP BY s.session_id, model
+	), models AS (
+		SELECT session_id, group_concat(model, ',') AS names FROM
+		(SELECT * FROM model_rows ORDER BY session_id, first_ns, model) GROUP BY session_id
+	)
+	SELECT p.session_id, p.service_name, p.first_ns, p.last_ns, p.trace_count, p.llm_count,
+		p.input_tokens, p.output_tokens, p.cost_usd, COALESCE(m.names,'')
+	FROM page p LEFT JOIN models m ON m.session_id=p.session_id
+	ORDER BY p.last_ns DESC, p.session_id DESC`
 	args = append(args, limit)
 	rows, err := s.r.QueryContext(ctx, query, args...)
 	if err != nil {

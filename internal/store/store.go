@@ -52,10 +52,11 @@ func costInRange(cost float64) bool {
 type Store struct {
 	w *sql.DB
 	r *sql.DB
+	u *sql.DB
 }
 
 func (s *Store) Reader() *sql.DB { return s.r }
 
 func (s *Store) Close() error {
-	return errors.Join(s.r.Close(), s.w.Close())
+	return errors.Join(s.r.Close(), s.u.Close(), s.w.Close())
 }

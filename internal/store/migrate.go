@@ -173,9 +173,22 @@ func Open(dataDir string) (*Store, error) {
 		return closeWriter(err)
 	}
 	reader.SetMaxOpenConns(4)
+	reader.SetMaxIdleConns(4)
 	if err := reader.Ping(); err != nil {
 		reader.Close()
 		return closeWriter(err)
 	}
-	return &Store{w: writer, r: reader}, nil
+	userReader, err := sql.Open("sqlite", readerDSN)
+	if err != nil {
+		reader.Close()
+		return closeWriter(err)
+	}
+	userReader.SetMaxOpenConns(1)
+	userReader.SetMaxIdleConns(1)
+	if err := userReader.Ping(); err != nil {
+		userReader.Close()
+		reader.Close()
+		return closeWriter(err)
+	}
+	return &Store{w: writer, r: reader, u: userReader}, nil
 }

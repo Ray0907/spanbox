@@ -153,7 +153,7 @@ func (s *Store) RunUserSQL(ctx context.Context, text string) (result SQLResult, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, config.SQLTimeout)
 	defer cancel()
-	conn, err := s.r.Conn(ctx)
+	conn, err := s.u.Conn(ctx)
 	if err != nil {
 		return result, err
 	}
