@@ -13,7 +13,6 @@ import (
 	collectortracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -52,7 +51,7 @@ func Decode(body []byte, mediaType string) ([]RawSpan, error) {
 			return nil, fmt.Errorf("decode protobuf: %w", err)
 		}
 	case ContentTypeJSON:
-		if err := protojson.Unmarshal(body, &request); err != nil {
+		if err := unmarshalOTLPJSON(body, &request); err != nil {
 			return nil, fmt.Errorf("decode JSON: %w", err)
 		}
 	default:

@@ -12,7 +12,6 @@ import (
 
 	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +63,7 @@ func (a *LogsAdapter) Decode(body []byte, mediaType string, logf func(string, ..
 			return nil, fmt.Errorf("decode logs protobuf: %w", err)
 		}
 	case ContentTypeJSON:
-		if err := protojson.Unmarshal(body, &request); err != nil {
+		if err := unmarshalOTLPJSON(body, &request); err != nil {
 			return nil, fmt.Errorf("decode logs JSON: %w", err)
 		}
 	default:

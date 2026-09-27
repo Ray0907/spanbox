@@ -47,6 +47,7 @@
 12. **major · §6.2**
    - **問題：** OTLP protobuf 的 `trace_id`/`span_id` 是 bytes；proto JSON mapping 則以 base64 表示 bytes，不是 hex。若 JSON decoder 將字串直接當 hex，會存錯 ID。規格也沒有驗證空值、長度、全零 ID、`end < start`，而 OTLP timestamps 是 `uint64`、SQLite INTEGER 是 signed 64-bit。
    - **具體修正：** 一律先由 `proto.Unmarshal`/`protojson.Unmarshal` 得到 `[]byte`，再轉 lowercase hex；要求 trace id 恰為 16 bytes、span/非空 parent id 恰為 8 bytes且非全零。寫 SQLite 前驗證 timestamps `<= math.MaxInt64` 且 `end >= start`；因設計不做 partial success，任一結構錯誤就整批回 400。
+   - **後續更正：** 上述「proto JSON mapping 以 base64 表示」不適用於 OTLP/JSON：[OTLP 規範](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)明定 `traceId`/`spanId` 為 hex，而非 base64。decoder 現在先把 hex ID 轉成 base64 再交給 protojson，base64 輸入仍相容；見 `internal/otlp/json.go`。
 
 13. **major · §6.2、§5.1**
    - **問題：** `AnyValue` 清單漏了 `bytes_value`，也未定義 nested array/kvlist、重複 key、nil value、`NaN`/`±Inf`。`encoding/json` 無法 marshal non-finite float，因此「raw attributes 永遠可入庫」目前不成立。

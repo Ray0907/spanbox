@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"math"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -319,5 +321,76 @@ func TestLogsAdapterExpiresPendingRequests(t *testing.T) {
 	}
 	if len(spans) != 1 || spans[0].StartNs != spans[0].EndNs {
 		t.Fatalf("expired request was paired: %#v", spans)
+	}
+}
+
+func TestDecodeAcceptsSpecHexIDs(t *testing.T) {
+	base64Body, _ := fixtureBytes(t)
+	want, err := Decode(base64Body, ContentTypeJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hexBody := string(base64Body)
+	for i, id := range []string{"AQIDBAUGBwgJCgsMDQ4PEA==", "ERITFBUWFxg=", "ISIjJCUmJyg=", "QUJDREVGR0hJSktMTU5PUA==", "UVJTVFVWV1g=", "MTIzNDU2Nzg="} {
+		decoded, err := base64.StdEncoding.DecodeString(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hexID := hex.EncodeToString(decoded)
+		if i%2 == 1 {
+			hexID = strings.ToUpper(hexID)
+		}
+		hexBody = strings.ReplaceAll(hexBody, `"`+id+`"`, `"`+hexID+`"`)
+	}
+	if strings.Contains(hexBody, "==") {
+		t.Fatal("fixture still contains base64 ids")
+	}
+	got, err := Decode([]byte(hexBody), ContentTypeJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("hex ids differ from base64 ids:\n got: %#v\nwant: %#v", got, want)
+	}
+}
+
+func TestDecodeHexIDsKeepsOtherFields(t *testing.T) {
+	body := []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{
+		"traceId":"5B8EFFF798038103D269B633813FC60C","spanId":"eee19b7ec3c1b174",
+		"name":"<chat> & call","kind":3,
+		"startTimeUnixNano":1759000000123456789,"endTimeUnixNano":1759000000123456799,
+		"attributes":[{"key":"traceId","value":{"stringValue":"eee19b7ec3c1b174"}}]}]}]}]}`)
+	spans, err := Decode(body, ContentTypeJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	span := spans[0]
+	if span.TraceID != "5b8efff798038103d269b633813fc60c" || span.SpanID != "eee19b7ec3c1b174" {
+		t.Fatalf("ids = %q %q", span.TraceID, span.SpanID)
+	}
+	if span.Name != "<chat> & call" || span.StartNs != 1759000000123456789 || span.EndNs != 1759000000123456799 {
+		t.Fatalf("fields changed: %#v", span)
+	}
+	if span.Attrs["traceId"] != "eee19b7ec3c1b174" {
+		t.Fatalf("attribute value rewritten: %#v", span.Attrs)
+	}
+}
+
+func TestDecodeRejectsTrailingDataWithHexIDs(t *testing.T) {
+	body := []byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b174","name":"x"}]}]}]} {}`)
+	if _, err := Decode(body, ContentTypeJSON); err == nil {
+		t.Fatal("trailing data accepted")
+	}
+}
+
+func TestLogsJSONAcceptsSpecHexIDs(t *testing.T) {
+	body := []byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"EEE19B7EC3C1B174"}]}]}]}`)
+	var request collectorlogspb.ExportLogsServiceRequest
+	if err := unmarshalOTLPJSON(body, &request); err != nil {
+		t.Fatal(err)
+	}
+	record := request.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+	if hex.EncodeToString(record.TraceId) != "5b8efff798038103d269b633813fc60c" || hex.EncodeToString(record.SpanId) != "eee19b7ec3c1b174" {
+		t.Fatalf("ids = %x %x", record.TraceId, record.SpanId)
 	}
 }

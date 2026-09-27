@@ -226,7 +226,7 @@ END;
 
 ### 6.2 解碼與驗證
 
-1. `proto.Unmarshal` 或 `protojson.Unmarshal` 進 `ExportTraceServiceRequest`。JSON 中 `traceId` / `spanId` 為 base64，由 protojson 自動還原成 `[]byte`；程式一律從 `[]byte` 轉 lowercase hex，絕不把 JSON 字串當 hex。
+1. `proto.Unmarshal` 或 `protojson.Unmarshal` 進 `ExportTraceServiceRequest`。OTLP/JSON 規範中 `traceId` / `spanId` / `parentSpanId` 為不分大小寫的 hex，與 protojson 採用的標準 Protobuf JSON mapping（base64）不同；因此 JSON 先把長度符合（trace 32、span 16 字元）的 hex ID 轉成 base64 再交給 protojson，既有的 base64 輸入仍接受（base64 長度為 24 / 12，不會混淆）。程式一律從 `[]byte` 轉 lowercase hex。
 2. 驗證：trace id 恰 16 bytes 且非全零；span id 恰 8 bytes 且非全零；parent span id 為空或恰 8 bytes 且非全零；`start`、`end` 皆 `<= math.MaxInt64` 且 `end >= start`。任一違反整批 400。
 3. `AnyValue` 遞迴轉 Go 值：string、bool、int64、float64、bytes（base64 string）、array（`[]any`）、kvlist（`map[string]any`，重複 key last-wins 並 warn）、未設值存 `nil`。非有限 float 轉字串 `"NaN"` / `"Infinity"` / `"-Infinity"`。
 4. 攤成 `RawSpan{TraceID, SpanID, ParentSpanID, Name, StartNs, EndNs, StatusCode, StatusMessage, TraceState, Attrs, Events, Links, Resource, Scope}`。
