@@ -34,6 +34,27 @@ jobs:
         with:
           files: |
             spanbox_*
+  aur:
+    needs: binaries
+    runs-on: ubuntu-latest
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: set pkgver
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        run: sed -i "s/^pkgver=.*/pkgver=${GITHUB_REF_NAME#v}/; s/^pkgrel=.*/pkgrel=1/" deploy/aur/PKGBUILD
+      - uses: KSXGitHub/github-actions-deploy-aur@v4
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        with:
+          pkgname: spanbox-bin
+          pkgbuild: deploy/aur/PKGBUILD
+          updpkgsums: true
+          test: true
+          commit_username: Ray Tien
+          commit_email: ray.tien0907@gmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ github.ref_name }}"
   image:
     runs-on: ubuntu-latest
     steps:

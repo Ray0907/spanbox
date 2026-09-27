@@ -1,0 +1,22 @@
+# Maintainer: Ray Tien <ray.tien0907@gmail.com>
+pkgname=spanbox-bin
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Single-binary OpenTelemetry trace monitor for LLM applications"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Ray0907/spanbox"
+license=('MIT')
+provides=('spanbox')
+conflicts=('spanbox')
+options=('!strip' '!debug')
+source=("LICENSE-$pkgver::https://raw.githubusercontent.com/Ray0907/spanbox/v$pkgver/LICENSE")
+source_x86_64=("spanbox-$pkgver-x86_64::$url/releases/download/v$pkgver/spanbox_v${pkgver}_linux_amd64")
+source_aarch64=("spanbox-$pkgver-aarch64::$url/releases/download/v$pkgver/spanbox_v${pkgver}_linux_arm64")
+sha256sums=('69ad1690db1c7dbd6da929e4209f2c7a3968816e0dff03426117b75d83fc9f5c')
+sha256sums_x86_64=('6b9d440f5d7ed4f7cc723610b4940d7c020b3ba84d0f0405145af4ea38c5b4f2')
+sha256sums_aarch64=('4c931c352c21e33ff8b26eeb9b3f6f25a158b270633fed7f098ae5d9efc417a7')
+
+package() {
+  install -Dm755 "spanbox-$pkgver-$CARCH" "$pkgdir/usr/bin/spanbox"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
