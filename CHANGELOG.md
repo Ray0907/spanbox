@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-09-28
 
 ### Added
 - `?format=json` on `/`, `/sessions`, `/search`, `/traces/{id}` and `/spans/{trace}/{span}` for agents and scripts. Lists take `limit` (default 20, max 50) and return a keyset `next_cursor`; `/search` is now pageable. Span `input`, `output` and `attributes` are windowed by character with `field`, `offset`, `len` (default 2000, max 20000) and `next_offset`, and flag invalid UTF-8 with `invalid_utf8`. These requests accept `Authorization: Bearer <AUTH_TOKEN>` and return JSON errors.
