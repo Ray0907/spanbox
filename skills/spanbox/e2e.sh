@@ -7,7 +7,7 @@ SH=${1:-bash}
 TMP=$(mktemp -d); trap 'kill $PID 2>/dev/null || true; rm -rf "$TMP"' EXIT
 go build -o "$TMP/spanbox" ./cmd/spanbox
 PORT=$((20000 + RANDOM % 20000))
-export SPANBOX_URL=http://127.0.0.1:$PORT SPANBOX_TOKEN=e2e-token-0123456789abcdef0123456789abcdef
+export SPANBOX_URL=http://127.0.0.1:$PORT SPANBOX_TOKEN=e2e-token-0123456789abcdef0123456789abcdef HERDR_PANE_ID=pane-e2e
 AUTH_TOKEN=$SPANBOX_TOKEN PORT=$PORT DATA_DIR=$TMP/data RETENTION_DAYS=0 "$TMP/spanbox" >"$TMP/log" 2>&1 & PID=$!
 for _ in $(seq 50); do curl -fsS "$SPANBOX_URL/healthz" >/dev/null 2>&1 && break; sleep 0.1; done
 
@@ -24,7 +24,7 @@ for i in range(3):
     err = i == 2
     spans += [
         {"traceId": b64(tid), "spanId": b64(root), "name": f"run-{i}", "startTimeUnixNano": str(t0), "endTimeUnixNano": str(t0 + 9 * 10**8),
-         "attributes": [a("gen_ai.operation.name", "invoke_agent")]},
+         "attributes": [a("gen_ai.operation.name", "invoke_agent")] + ([a("session.id", "pane-e2e")] if i == 1 else [])},
         {"traceId": b64(tid), "spanId": b64(llm), "parentSpanId": b64(root), "name": "chat gpt-4o",
          "startTimeUnixNano": str(t0 + 10**8), "endTimeUnixNano": str(t0 + 8 * 10**8),
          "status": {"code": "STATUS_CODE_ERROR" if err else "STATUS_CODE_OK"},
@@ -41,20 +41,27 @@ sleep 1
 # Extract the q() definition from SKILL.md so the test runs exactly what agents run.
 Q=$(grep '^q() {' skills/spanbox/SKILL.md)
 run() { "$SH" -c "$Q; q '$1'"; }
+run_skill() { "$SH" -c "$Q; $1"; }
 fail() { echo "FAIL: $*"; exit 1; }
 ERR=00000000000000000000000000000003; LLM=0000000000000067
 
 echo "## spanbox skill E2E ($SH)"; echo
 r=$(run '/?format=json&limit=1');                          echo "ready: $(jq -c '{n:(.items|length),next:(.next_cursor!=null)}' <<<"$r")"
 [ "$(jq '.items|length' <<<"$r")" = 1 ] && [ "$(jq '.next_cursor!=null' <<<"$r")" = true ] || fail ready
-r=$(run '/?format=json&limit=10&range=24h&errors=1');      echo "rung1 errors=1: $(jq -c '[.items[].trace_id]' <<<"$r")"
+grep -Fq 'q "/?format=json&session=$HERDR_PANE_ID"' skills/spanbox/SKILL.md || fail 'session rung missing from skill'
+r=$(run_skill 'q "/?format=json&session=$HERDR_PANE_ID"'); echo "own session: $(jq -c '[.items[].trace_id]' <<<"$r")"
+[ "$(jq '.items|length' <<<"$r")" = 1 ] && [ "$(jq -r '.items[0].trace_id' <<<"$r")" = 00000000000000000000000000000002 ] || fail 'own session'
+grep -Fq "q '/dashboard/data?range=24h'" skills/spanbox/SKILL.md || fail 'dashboard rung missing from skill'
+r=$(run '/dashboard/data?range=24h'); echo "overview: $(jq -c '{TraceCount,TotalCost,ErrorRate}' <<<"$r")"
+[ "$(jq -r '.TraceCount' <<<"$r")" = 3 ] || fail 'overview trace count'
+r=$(run '/?format=json&limit=10&range=24h&errors=1');      echo "rung3 errors=1: $(jq -c '[.items[].trace_id]' <<<"$r")"
 [ "$(jq -r '.items[0].trace_id' <<<"$r")" = $ERR ] && [ "$(jq '.items|length' <<<"$r")" = 1 ] || fail rung1
-r=$(run '/search?format=json&limit=10&q=rate%20limit');     echo "rung2 search: $(jq -c '[.items[]|{trace_id,span_id}]' <<<"$r")"
+r=$(run '/search?format=json&limit=10&q=rate%20limit');     echo "rung4 search: $(jq -c '[.items[]|{trace_id,span_id}]' <<<"$r")"
 [ "$(jq -r '.items[0].span_id' <<<"$r")" = $LLM ] || fail rung2
-r=$(run "/traces/$ERR?format=json");                        echo "rung3 outline: $(jq -c '[.spans[]|{span_id,kind,status_code,output_chars}]' <<<"$r")"
+r=$(run "/traces/$ERR?format=json");                        echo "rung5 outline: $(jq -c '[.spans[]|{span_id,kind,status_code,output_chars}]' <<<"$r")"
 grep -q '"text"' <<<"$r" && fail "rung3 leaks bodies"
 total=$(jq "[.spans[]|select(.span_id==\"$LLM\")][0].output_chars" <<<"$r")
-r=$(run "/spans/$ERR/$LLM?format=json");                    echo "rung4 head: output total_chars=$(jq .output.total_chars <<<"$r") text=$(jq '.output.text|length' <<<"$r") next=$(jq .output.next_offset <<<"$r")"
+r=$(run "/spans/$ERR/$LLM?format=json");                    echo "rung6 head: output total_chars=$(jq .output.total_chars <<<"$r") text=$(jq '.output.text|length' <<<"$r") next=$(jq .output.next_offset <<<"$r")"
 [ "$(jq '.output.text|length' <<<"$r")" = 2000 ] && [ "$(jq .output.next_offset <<<"$r")" = 2000 ] || fail rung4
 [ "$(jq .output.total_chars <<<"$r")" = "$total" ] || fail "rung4 total_chars != outline output_chars ($total)"
 text=$(jq -r .output.text <<<"$r"); off=2000; pages=1
@@ -62,7 +69,7 @@ while [ "$off" != null ]; do
   r=$(run "/spans/$ERR/$LLM?format=json&field=output&offset=$off&len=4000"); pages=$((pages+1))
   text+=$(jq -r .output.text <<<"$r"); off=$(jq .output.next_offset <<<"$r")
 done
-echo "rung5 paged output: pages=$pages chars=${#text} ends_with_error=$([[ $text == *'rate limit exceeded for gpt-4o"}]' ]] && echo yes || echo no)"
+echo "rung7 paged output: pages=$pages chars=${#text} ends_with_error=$([[ $text == *'rate limit exceeded for gpt-4o"}]' ]] && echo yes || echo no)"
 [ "${#text}" = "$total" ] && [[ $text == *'rate limit exceeded'* ]] || fail rung5
 r=$(SPANBOX_TOKEN=wrong "$SH" -c "$Q; q '/?format=json'");  echo "bad token: $r"
 [ "$(jq -r .error <<<"$r")" = unauthorized ] || fail "bad token"

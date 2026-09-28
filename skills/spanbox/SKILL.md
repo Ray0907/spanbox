@@ -19,20 +19,25 @@ q() { curl -sS ${SPANBOX_TOKEN:+-H} ${SPANBOX_TOKEN:+"Authorization: Bearer $SPA
 
 Stop at the first rung that answers the question.
 
-1. **Find traces** — narrow with filters before paging.
+1. **Overview** — cost, tokens, trace count, errors, daily latency and model breakdown for the last 24 hours.
+   `q '/dashboard/data?range=24h'`
+   Keys are PascalCase: `TotalCost`, `TotalInput`, `TotalOutput`, `TraceCount`, `ErrorRate`, `Days`, `DailyCost`, `DailyP50`, `DailyP95`, `Models`.
+2. **Your own session** — if the proxy tags calls with `X-Spanbox-Session: $HERDR_PANE_ID`, inspect only that pane's traces.
+   `q "/?format=json&session=$HERDR_PANE_ID"`
+3. **Find traces** — narrow with filters before paging.
    `q '/?format=json&limit=10&range=24h&errors=1'`
    Filters: `range` (`15m` `1h` `24h` `7d`, or `custom` with RFC3339 `from`/`to`), `errors=1`, `service`, `model`, `session`, `user`, `min_duration` (ms).
    Each item has `trace_id`, `name`, `duration_ms`, `cost_usd`, `input_tokens`, `output_tokens`, `has_error`, `span_count`.
-2. **Or search content** — FTS over span input, output and name.
+4. **Or search content** — FTS over span input, output and name.
    `q '/search?format=json&limit=10&q=rate%20limit'`
    Items carry `trace_id`, `span_id` and a short `snippet`. The snippet often is the answer.
-3. **Trace outline** — span tree, no bodies.
+5. **Trace outline** — span tree, no bodies.
    `q '/traces/<trace_id>?format=json'`
    Per span: `span_id`, `parent_span_id`, `name`, `kind` (`llm` `tool` `agent` `retrieval` `embedding` `other`), `model`, `start_offset_ms`, `duration_ms`, tokens, `cost_usd`, `status_code` (2 = error), `input_chars`, `output_chars`. Pick the span from this; use `*_chars` to judge how much reading it costs.
-4. **Span head** — metadata plus the first 2000 chars of `input`, `output`, `attributes`.
+6. **Span head** — metadata plus the first 2000 chars of `input`, `output`, `attributes`.
    `q '/spans/<trace_id>/<span_id>?format=json'`
    Each field is `{"text", "total_chars", "next_offset"}`. `next_offset: null` means you have it all.
-5. **Page one field** — only if the head did not answer.
+7. **Page one field** — only if the head did not answer.
    `q '/spans/<trace_id>/<span_id>?format=json&field=output&offset=2000&len=4000'`
    `len` max 20000. Follow `next_offset`; stop as soon as you have the answer. Output is usually the end of the story — read `output` before a long `input`.
 

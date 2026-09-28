@@ -363,9 +363,70 @@ func TestAgentJSONErrorsAndHTML(t *testing.T) {
 	}
 }
 
+func TestDashboardDataAuth(t *testing.T) {
+	handler, _ := newTestHandler(t, "secret")
+	check := func(name, path, bearer string, wantStatus int, wantType, wantBody string) {
+		t.Helper()
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			if bearer != "" {
+				req.Header.Set("Authorization", "Bearer "+bearer)
+			}
+			out := httptest.NewRecorder()
+			handler.ServeHTTP(out, req)
+			if out.Code != wantStatus || out.Header().Get("Content-Type") != wantType || wantBody != "" && strings.TrimSpace(out.Body.String()) != wantBody {
+				t.Fatalf("status=%d type=%q body=%q", out.Code, out.Header().Get("Content-Type"), out.Body.String())
+			}
+			if wantStatus == 200 {
+				var data struct{ TraceCount int64 }
+				if err := json.Unmarshal(out.Body.Bytes(), &data); err != nil || data.TraceCount != 0 {
+					t.Fatalf("dashboard JSON: %v %q", err, out.Body.String())
+				}
+			}
+		})
+	}
+	check("valid bearer", "/dashboard/data?range=24h", "secret", 200, "application/json", "")
+	for _, auth := range []struct{ name, token string }{{"missing", ""}, {"wrong", "wrong"}} {
+		check(auth.name+" bearer", "/dashboard/data?range=24h", auth.token, 401, "application/json", `{"error":"unauthorized"}`)
+	}
+	for _, path := range []string{"/dashboard", "/"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer secret")
+		out := httptest.NewRecorder()
+		handler.ServeHTTP(out, req)
+		if out.Code != http.StatusFound || out.Header().Get("Location") != "/login" {
+			t.Errorf("bearer on HTML %s: status=%d location=%q", path, out.Code, out.Header().Get("Location"))
+		}
+	}
+	login := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=secret"))
+	login.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	out := httptest.NewRecorder()
+	handler.ServeHTTP(out, login)
+	if len(out.Result().Cookies()) != 1 {
+		t.Fatalf("login cookies: %v", out.Result().Cookies())
+	}
+	cookie := out.Result().Cookies()[0]
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/data?range=24h", nil)
+	req.AddCookie(cookie)
+	out = httptest.NewRecorder()
+	handler.ServeHTTP(out, req)
+	if out.Code != 200 || out.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("cookie dashboard: %d %q", out.Code, out.Body.String())
+	}
+	var data struct{ TraceCount int64 }
+	if err := json.Unmarshal(out.Body.Bytes(), &data); err != nil || data.TraceCount != 0 {
+		t.Fatalf("cookie dashboard JSON: %v %q", err, out.Body.String())
+	}
+	open, _ := newTestHandler(t, "")
+	out = request(t, open, http.MethodGet, "/dashboard/data?range=24h", "", "", nil)
+	if out.Code != 200 || out.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("open dashboard: %d %q", out.Code, out.Body.String())
+	}
+}
+
 func TestAgentJSONAuth(t *testing.T) {
 	handler, _ := newTestHandler(t, "secret")
-	for _, path := range []string{"/?format=json", "/sessions?format=json", "/search?format=json", "/traces/" + strings.Repeat("0", 32) + "?format=json", "/spans/" + strings.Repeat("0", 32) + "/" + strings.Repeat("0", 16) + "?format=json"} {
+	for _, path := range []string{"/?format=json", "/sessions?format=json", "/search?format=json", "/traces/" + strings.Repeat("0", 32) + "?format=json", "/spans/" + strings.Repeat("0", 32) + "/" + strings.Repeat("0", 16) + "?format=json", "/dashboard/data?range=24h"} {
 		resp := request(t, handler, http.MethodGet, path, "", "", nil)
 		if resp.Code == 200 || resp.Code == 404 {
 			t.Errorf("unauthenticated %s: %d", path, resp.Code)
@@ -376,6 +437,24 @@ func TestAgentJSONAuth(t *testing.T) {
 		handler.ServeHTTP(out, req)
 		if out.Code == http.StatusFound || out.Code == http.StatusUnauthorized {
 			t.Errorf("bearer %s: %d", path, out.Code)
+		}
+	}
+	for _, path := range []string{"/dashboard/data?range=24h", "/?format=json"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer wrong")
+		out := httptest.NewRecorder()
+		handler.ServeHTTP(out, req)
+		if out.Code != http.StatusUnauthorized || !strings.Contains(out.Body.String(), `"error":"unauthorized"`) {
+			t.Errorf("wrong bearer %s: %d %q", path, out.Code, out.Body.String())
+		}
+	}
+	for _, path := range []string{"/dashboard", "/"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer secret")
+		out := httptest.NewRecorder()
+		handler.ServeHTTP(out, req)
+		if out.Code != http.StatusFound {
+			t.Errorf("bearer on HTML %s must still redirect to login: %d", path, out.Code)
 		}
 	}
 }

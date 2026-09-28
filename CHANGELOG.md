@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `/dashboard/data` accepts Bearer authentication and returns JSON 401 for unauthorized agents while preserving cookie access for the UI.
+- Agent skill rungs for the 24-hour dashboard overview and proxy-tagged self-session traces, covered by the skill E2E test.
+
 ## 0.4.0 — 2026-09-28
 
 ### Added

@@ -204,12 +204,13 @@ On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. 
 
 ## JSON API
 
-Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>`; failures return `{"error": "..."}` with a 4xx status.
+Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. `/dashboard/data` is JSON without a format parameter. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>`; failures return `{"error": "..."}` with a 4xx status on these JSON routes. The HTML dashboard still requires a login cookie.
 
 | Route | Returns |
 |---|---|
 | `/?format=json` | Traces. Same filters as the UI: `range` (`15m`, `1h`, `24h`, `7d`, or `custom` with RFC3339 `from`/`to`), `errors=1`, `service`, `model`, `session`, `user`, `min_duration` (ms) |
 | `/sessions?format=json` | Sessions |
+| `/dashboard/data?range=24h` | Overview: PascalCase `TotalCost`, `TotalInput`, `TotalOutput`, `TraceCount`, `ErrorRate`, `Days`, `DailyCost`, `DailyP50`, `DailyP95`, `Models`, etc. |
 | `/search?format=json&q=...` | Full-text hits with `trace_id`, `span_id` and a snippet |
 | `/traces/{trace_id}?format=json` | Trace summary and flat span list with token, cost, status and `input_chars`/`output_chars`, without bodies |
 | `/spans/{trace_id}/{span_id}?format=json` | Span metadata and the first 2000 characters of `input`, `output` and `attributes` |
@@ -223,7 +224,7 @@ curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/spans/<trace_
 
 ## Agent skill
 
-[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.
+[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read the overview and its own proxy-tagged session (`X-Spanbox-Session: $HERDR_PANE_ID`), then use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.
 
 ## SQL console security
 
