@@ -50,6 +50,10 @@ func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if r.URL.Query().Get("format") == "json" {
+		deps.agentTraces(w, r)
+		return
+	}
 	filter, view, err := traceFilter(r)
 	query := cloneValues(r.URL.Query())
 	query.Del("cursor")
@@ -169,7 +173,15 @@ func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 	}
 	traceID := strings.TrimPrefix(r.URL.Path, "/traces/")
 	if len(traceID) != 32 || strings.Contains(traceID, "/") {
+		if r.URL.Query().Get("format") == "json" {
+			writeAgentError(w, 404, "not found")
+			return
+		}
 		http.NotFound(w, r)
+		return
+	}
+	if r.URL.Query().Get("format") == "json" {
+		deps.agentTrace(w, r, traceID)
 		return
 	}
 	trace, spans, err := deps.Store.GetTrace(r.Context(), traceID)
@@ -247,6 +259,10 @@ type sessionsPage struct {
 func (deps Deps) sessions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet || r.URL.Path != "/sessions" {
 		http.NotFound(w, r)
+		return
+	}
+	if r.URL.Query().Get("format") == "json" {
+		deps.agentSessions(w, r)
 		return
 	}
 	page := sessionsPage{layoutData: layoutData{Title: "Sessions", Section: "sessions", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Range: r.URL.Query().Get("range"), From: r.URL.Query().Get("from"), To: r.URL.Query().Get("to")}
@@ -344,6 +360,10 @@ type searchPage struct {
 func (deps Deps) search(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if r.URL.Query().Get("format") == "json" {
+		deps.agentSearch(w, r)
 		return
 	}
 	page := searchPage{layoutData: layoutData{Title: "Search", Section: "search", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Query: r.URL.Query().Get("q")}
@@ -451,7 +471,15 @@ func (deps Deps) span(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/spans/"), "/")
 	if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) != 16 {
+		if r.URL.Query().Get("format") == "json" {
+			writeAgentError(w, 404, "not found")
+			return
+		}
 		http.NotFound(w, r)
+		return
+	}
+	if r.URL.Query().Get("format") == "json" {
+		deps.agentSpan(w, r, parts[0], parts[1])
 		return
 	}
 	span, err := deps.Store.GetSpan(r.Context(), parts[0], parts[1])

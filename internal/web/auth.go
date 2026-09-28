@@ -83,8 +83,19 @@ func authenticate(token string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		agentRoute := r.URL.Path == "/" || r.URL.Path == "/sessions" || r.URL.Path == "/search" || strings.HasPrefix(r.URL.Path, "/traces/") || strings.HasPrefix(r.URL.Path, "/spans/")
+		if agentRoute && r.URL.Query().Get("format") == "json" {
+			if provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tokenEqual(provided, token) {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
 		cookie, err := r.Cookie("spanbox_session")
 		if err != nil || !tokenEqual(cookie.Value, session) {
+			if agentRoute && r.URL.Query().Get("format") == "json" {
+				writeAgentError(w, http.StatusUnauthorized, "unauthorized")
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}

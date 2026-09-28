@@ -217,6 +217,34 @@ func (s *Store) GetTrace(ctx context.Context, traceID string) (TraceRow, []Span,
 	return trace, spans, nil
 }
 
+type AgentSpan struct {
+	Span
+	InputChars  int
+	OutputChars int
+}
+
+// ListTraceAgentSpans reads only metadata; span bodies stay behind the span endpoint.
+func (s *Store) ListTraceAgentSpans(ctx context.Context, traceID string) ([]AgentSpan, error) {
+	rows, err := s.r.QueryContext(ctx, `SELECT span_id, parent_span_id, name, kind, start_ns, duration_ms,
+		request_model, response_model, input_tokens, output_tokens, cost_usd, status_code,
+		length(input_content), length(output_content) FROM spans WHERE trace_id=? ORDER BY start_ns, span_id`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []AgentSpan{}
+	for rows.Next() {
+		var span AgentSpan
+		if err := rows.Scan(&span.SpanID, &span.ParentSpanID, &span.Name, &span.Kind, &span.StartNs, &span.DurationMs,
+			&span.RequestModel, &span.ResponseModel, &span.InputTokens, &span.OutputTokens, &span.CostUSD, &span.StatusCode,
+			&span.InputChars, &span.OutputChars); err != nil {
+			return nil, err
+		}
+		result = append(result, span)
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) GetSpan(ctx context.Context, traceID, spanID string) (Span, error) {
 	return scanSpan(s.r.QueryRowContext(ctx, spanSelect+" WHERE trace_id=? AND span_id=?", traceID, spanID))
 }
@@ -457,7 +485,7 @@ type SearchHit struct {
 	StartNs   int64
 }
 
-func (s *Store) Search(ctx context.Context, phrase string, limit int) ([]SearchHit, error) {
+func (s *Store) Search(ctx context.Context, phrase string, limit int, cursor ...SearchHit) ([]SearchHit, error) {
 	if phrase == "" {
 		return nil, nil
 	}
@@ -465,10 +493,18 @@ func (s *Store) Search(ctx context.Context, phrase string, limit int) ([]SearchH
 		limit = 100
 	}
 	match := `"` + strings.ReplaceAll(phrase, `"`, `""`) + `"`
-	rows, err := s.r.QueryContext(ctx, `SELECT s.trace_id, s.span_id, t.name, s.name, s.kind,
+	query := `SELECT s.trace_id, s.span_id, t.name, s.name, s.kind,
 		COALESCE(NULLIF(s.response_model,''), s.request_model), snippet(spans_fts, -1, '[', ']', '…', 16), s.start_ns
 		FROM spans_fts JOIN spans s ON s.id=spans_fts.rowid JOIN traces t ON t.trace_id=s.trace_id
-		WHERE spans_fts MATCH ? ORDER BY s.start_ns DESC, s.span_id DESC LIMIT ?`, match, limit)
+		WHERE spans_fts MATCH ?`
+	args := []any{match}
+	if len(cursor) != 0 {
+		query += ` AND (s.start_ns, s.span_id) < (?, ?)`
+		args = append(args, cursor[0].StartNs, cursor[0].SpanID)
+	}
+	query += ` ORDER BY s.start_ns DESC, s.span_id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := s.r.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
