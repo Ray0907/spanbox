@@ -202,9 +202,28 @@ SPANBOX_URL=http://localhost:4318 AUTH_TOKEN=<token> python examples/otel-python
 
 On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. If the SDK logs that its queue is full, raise `max_queue_size` on `BatchSpanProcessor`; the default of 2048 drops spans under bursts before they reach spanbox.
 
+## JSON API
+
+Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>`; failures return `{"error": "..."}` with a 4xx status.
+
+| Route | Returns |
+|---|---|
+| `/?format=json` | Traces. Same filters as the UI: `range` (`15m`, `1h`, `24h`, `7d`, or `custom` with RFC3339 `from`/`to`), `errors=1`, `service`, `model`, `session`, `user`, `min_duration` (ms) |
+| `/sessions?format=json` | Sessions |
+| `/search?format=json&q=...` | Full-text hits with `trace_id`, `span_id` and a snippet |
+| `/traces/{trace_id}?format=json` | Trace summary and flat span list with token, cost, status and `input_chars`/`output_chars`, without bodies |
+| `/spans/{trace_id}/{span_id}?format=json` | Span metadata and the first 2000 characters of `input`, `output` and `attributes` |
+
+Lists take `limit` (default 20, max 50) and return `next_cursor`; pass it back as `cursor` with the other parameters unchanged until it is `null`. Span fields are windows of `{"text", "total_chars", "next_offset"}`; read further with `field=input|output|attributes&offset=N&len=L` (`len` max 20000). Offsets count Unicode code points, so windows reassemble byte for byte in any script; a field whose stored bytes are not valid UTF-8 carries `"invalid_utf8": true`.
+
+```sh
+curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/?format=json&errors=1&range=24h&limit=10'
+curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/spans/<trace_id>/<span_id>?format=json&field=output&offset=2000&len=4000'
+```
+
 ## Agent skill
 
-[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read traces coarse to fine through `?format=json` on `/`, `/search`, `/traces/{id}` and `/spans/{trace}/{span}`, following `next_cursor` and `next_offset` instead of loading whole prompts. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh` runs every command in the skill against a freshly built binary.
+[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.
 
 ## SQL console security
 
