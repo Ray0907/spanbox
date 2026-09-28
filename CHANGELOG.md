@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-09-28
 
 ### Added
 - `/dashboard/data` accepts Bearer authentication and returns JSON 401 for unauthorized agents while preserving cookie access for the UI.
