@@ -202,6 +202,10 @@ SPANBOX_URL=http://localhost:4318 AUTH_TOKEN=<token> python examples/otel-python
 
 On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. If the SDK logs that its queue is full, raise `max_queue_size` on `BatchSpanProcessor`; the default of 2048 drops spans under bursts before they reach spanbox.
 
+## Agent skill
+
+[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read traces coarse to fine through `?format=json` on `/`, `/search`, `/traces/{id}` and `/spans/{trace}/{span}`, following `next_cursor` and `next_offset` instead of loading whole prompts. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh` runs every command in the skill against a freshly built binary.
+
 ## SQL console security
 
 `/sql` is available only when `AUTH_TOKEN` is set and only to an authenticated UI session. Queries run through a read-only SQLite connection with `query_only`, a tokenizer guard, a 5-second timeout, and strict result limits. SQLite's Go driver does not expose an engine-level authorizer, so this console is for trusted operators holding the token—not untrusted users.
