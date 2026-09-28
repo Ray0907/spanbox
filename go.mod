@@ -1,6 +1,6 @@
 module github.com/Ray0907/spanbox
 
-go 1.26.1
+go 1.26.8
 
 require (
 	go.opentelemetry.io/proto/otlp v1.11.0

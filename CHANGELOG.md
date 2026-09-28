@@ -6,6 +6,9 @@
 - `/dashboard/data` accepts Bearer authentication and returns JSON 401 for unauthorized agents while preserving cookie access for the UI.
 - Agent skill rungs for the 24-hour dashboard overview and proxy-tagged self-session traces, covered by the skill E2E test.
 
+### Fixed
+- Bump Go to 1.26.8 to avoid race-detector crashes caused by [golang/go#78059](https://github.com/golang/go/issues/78059).
+
 ## 0.4.0 — 2026-09-28
 
 ### Added
