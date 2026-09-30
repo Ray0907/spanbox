@@ -109,14 +109,12 @@ func TestRoundTripE2E(t *testing.T) {
 	}
 
 	paths := []string{"/?format=json&limit=50"}
-	var lines []store.Span
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	for decoder.More() {
 		var span store.Span
 		if err := decoder.Decode(&span); err != nil {
 			t.Fatal(err)
 		}
-		lines = append(lines, span)
 		paths = append(paths, "/traces/"+span.TraceID+"?format=json")
 		for _, field := range []string{"input", "output", "attributes"} {
 			for _, offset := range []int{0, 1, 7, 20000, 4 << 20} {

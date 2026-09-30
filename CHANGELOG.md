@@ -2,9 +2,21 @@
 
 ## Unreleased
 
-- Retention keeps mixed-age/incomplete traces whole, cooperatively compacts FTS/WAL and reclaims pages; legacy non-incremental DBs warn once instead of failing cleanup, and import-paused purges log and retry after one minute.
-- Schema v1→v2 builds dashboard/search indexes at startup. A 500k-span upgrade took 1.384s with 41.98 MiB peak WAL and 73.71 MiB peak additional DB/WAL/SHM space; plan at least 512 MiB extra data/temp filesystem headroom for a comparable DB, beyond backups. Larger metadata/databases need more; see README and the repeatable load report.
-- Docs gap audit (`2026-09-30-docs-gap.md`): verified configuration defaults and added missing route/auth documentation.
+### Added
+- `PURGE_BATCH_SIZE` (default 10, 1–200) and `FTS_MERGE_EVERY` (default 256, 1–1024) tune retention. Defaults keep `/search` p95 within 2x baseline and ingest p95 within 3x during a purge (500k spans: search 150ms baseline, 209ms during purge).
+- `scripts/roundtrip-e2e.sh` (export/import round trip across two fresh instances) and `scripts/load-e2e.sh` (retention, concurrent read/ingest and upgrade load check; opt-in, not part of `go test`).
+- End-to-end test for the ChatGPT-authenticated Codex proxy.
+
+### Changed
+- `/search` selects a page of matches from an index before reading span bodies, and the dashboard reads a covering index. Schema v1→v2 builds these at startup: a 500k-span upgrade took 1.384s with 41.98 MiB peak WAL and 73.71 MiB peak additional DB/WAL/SHM space. Keep at least 512 MiB extra data/temp filesystem headroom for a comparable DB, beyond backups; see README.
+- Retention deletes in small turns with yields, compacts the FTS index and WAL cooperatively and reclaims pages. At 500k spans a purge takes about 68s and the DB shrinks from 1212 to 608 MiB. Legacy non-incremental `auto_vacuum` DBs warn once instead of failing cleanup; a purge skipped because an import is running retries after one minute.
+- Export filters (range, model, errors) select spans, not whole traces. Import streams with bounded lines and batches instead of a 32 MiB body limit, and pauses retention while it runs.
+
+### Fixed
+- Retention no longer deletes traces that still contain unfinished spans or recent arrivals.
+- Invalid UTF-8 survives export/import byte for byte.
+- `/proxy/chatgpt/` accepts only `codex/responses`; a client disconnect mid-stream keeps the partial Responses output.
+- Documented configuration defaults and routes match the code.
 
 ## 0.4.1 — 2026-09-28
 
