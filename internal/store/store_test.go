@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +77,12 @@ func TestOpenNewAndExisting(t *testing.T) {
 	}
 	if version != len(migrations) {
 		t.Fatalf("user_version = %d, want %d", version, len(migrations))
+	}
+	if runtime.GOOS == "windows" {
+		// Windows permissions use ACLs, not POSIX 0600/0700 mode bits.
+		// Reopen, schema version and WAL checks above still run.
+		t.Log("POSIX permission-bit assertions are not applicable to Windows ACLs")
+		return
 	}
 	fileInfo, err := os.Stat(filepath.Join(dir, "spanbox.db"))
 	if err != nil {

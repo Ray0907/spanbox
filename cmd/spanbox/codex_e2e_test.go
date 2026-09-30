@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -130,6 +131,9 @@ func TestCodexProxyE2E(t *testing.T) {
 
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "spanbox")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	build := exec.Command("go", "build", "-race", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build spanbox: %v\n%s", err, output)
@@ -171,10 +175,19 @@ func TestCodexProxyE2E(t *testing.T) {
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }()
 	defer func() {
-		_ = cmd.Process.Signal(os.Interrupt)
+		if runtime.GOOS == "windows" {
+			// Go cannot send os.Interrupt on Windows. Keep every proxy/data
+			// assertion, but do not claim a graceful shutdown test here.
+			t.Log("Windows cleanup uses forced termination; graceful interrupt assertion is Unix-only")
+			if err := cmd.Process.Kill(); err != nil {
+				t.Errorf("terminate spanbox: %v", err)
+			}
+		} else {
+			_ = cmd.Process.Signal(os.Interrupt)
+		}
 		select {
 		case err := <-exited:
-			if err != nil {
+			if err != nil && runtime.GOOS != "windows" {
 				t.Errorf("spanbox exit: %v", err)
 			}
 		case <-time.After(12 * time.Second):

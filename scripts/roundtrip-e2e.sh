@@ -6,8 +6,9 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/spanbox-roundtrip.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 echo 'Building fresh spanbox binary'
-go build -o "$work/spanbox" ./cmd/spanbox
-python3 - "$PWD" "$work" <<'PY'
+binary="$work/spanbox$(go env GOEXE)"
+go build -o "$binary" ./cmd/spanbox
+"${PYTHON:-python3}" - "$PWD" "$work" "$binary" <<'PY'
 import base64
 import copy
 import json
@@ -20,7 +21,7 @@ import time
 import urllib.error
 import urllib.request
 
-root, work = map(Path, sys.argv[1:])
+root, work, binary = map(Path, sys.argv[1:])
 token = "roundtrip-e2e-secret"
 processes = []
 logs = []
@@ -53,7 +54,11 @@ def start(name):
     logs.append(log)
     env = {"PATH": os.environ.get("PATH", ""), "PORT": str(port),
            "DATA_DIR": str(work / name), "RETENTION_DAYS": "0", "AUTH_TOKEN": token}
-    process = subprocess.Popen([str(work / "spanbox")], env=env, stdout=log, stderr=log)
+    # Native Windows processes need the system/temp environment too.
+    for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    process = subprocess.Popen([str(binary)], env=env, stdout=log, stderr=log)
     processes.append(process)
     base = "http://127.0.0.1:" + str(port)
     deadline = time.monotonic() + 15
@@ -141,6 +146,7 @@ except BaseException:
 finally:
     for process in processes:
         if process.poll() is None:
+            # SIGTERM on Unix; TerminateProcess on Windows, not graceful.
             process.terminate()
     for process in processes:
         try:

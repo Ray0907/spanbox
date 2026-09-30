@@ -1,7 +1,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, ci-cross-platform]
   pull_request:
 jobs:
   test:
@@ -16,3 +16,102 @@ jobs:
       - run: go test -race ./...
       - run: CGO_ENABLED=0 go build ./cmd/spanbox
       - run: docker build -t spanbox:ci .
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+      - name: Put the cgo compiler on PATH
+        env:
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+        run: '"$env:MSYS2_LOCATION\ucrt64\bin" >> $env:GITHUB_PATH'
+      - run: gcc --version
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - run: go build -o spanbox.exe ./cmd/spanbox
+        env:
+          CGO_ENABLED: "0"
+      - name: Export/import round trip (Git Bash and native Python)
+        shell: bash
+        env:
+          PYTHON: python
+        run: bash scripts/roundtrip-e2e.sh
+      - name: Real Windows binary OTLP ingest, HTTP read and shutdown
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $env:PORT = "$($listener.LocalEndpoint.Port)"
+          $listener.Stop()
+          $env:DATA_DIR = Join-Path $env:RUNNER_TEMP "spanbox-smoke-$([guid]::NewGuid())"
+          $env:RETENTION_DAYS = '0'
+          $env:AUTH_TOKEN = 'windows-smoke-secret'
+          New-Item -ItemType Directory $env:DATA_DIR | Out-Null
+          $stdout = Join-Path $env:DATA_DIR 'stdout.log'
+          $stderr = Join-Path $env:DATA_DIR 'stderr.log'
+          $process = Start-Process -FilePath (Resolve-Path ./spanbox.exe) -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            $base = "http://127.0.0.1:$env:PORT"
+            $ready = $false
+            for ($i = 0; $i -lt 100; $i++) {
+              if ($process.HasExited) { throw 'spanbox exited before readiness' }
+              try {
+                Invoke-RestMethod "$base/healthz" -TimeoutSec 1 | Out-Null
+                $ready = $true
+                break
+              } catch { Start-Sleep -Milliseconds 100 }
+            }
+            if (-not $ready) { throw 'spanbox never became healthy' }
+            $headers = @{ Authorization = "Bearer $env:AUTH_TOKEN" }
+            $start = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() * 1000000
+            $end = $start + 1000000
+            $body = @"
+          {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"11111111111111111111111111111111","spanId":"2222222222222222","name":"windows-smoke","startTimeUnixNano":"$start","endTimeUnixNano":"$end"}]}]}]}
+          "@
+            Invoke-RestMethod "$base/v1/traces" -Method Post -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 10 | Out-Null
+            $trace = Invoke-RestMethod "$base/traces/11111111111111111111111111111111?format=json" -Headers $headers -TimeoutSec 10
+            if ($trace.trace_id -ne '11111111111111111111111111111111' -or $trace.span_count -ne 1 -or $trace.spans.Count -ne 1 -or $trace.spans[0].span_id -ne '2222222222222222' -or $trace.spans[0].name -ne 'windows-smoke') { throw 'OTLP span did not round trip over HTTP' }
+            if ($process.HasExited) { throw 'spanbox exited unexpectedly' }
+            Write-Host 'PASS real Windows binary: one OTLP span ingested and read over HTTP'
+          } finally {
+            # Windows Stop-Process is forced termination, not Unix SIGTERM.
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+            if (-not $process.WaitForExit(15000)) { throw 'spanbox did not terminate' }
+            $process.Dispose()
+            Get-Content $stdout, $stderr
+            Remove-Item -Recurse -Force $env:DATA_DIR
+          }
+          Write-Host 'PASS Windows process shutdown and temporary database cleanup (forced, not graceful)'
+
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - name: Install Arch build and script dependencies
+        run: pacman -Syu --noconfirm --needed gcc git python tar
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - run: CGO_ENABLED=0 go build ./cmd/spanbox
+      - run: bash scripts/roundtrip-e2e.sh
