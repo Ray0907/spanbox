@@ -108,6 +108,10 @@ jobs:
       - name: Install Arch build and script dependencies
         run: pacman -Syu --noconfirm --needed gcc git python tar
       - uses: actions/checkout@v4
+      - name: Trust only the checked-out container workspace
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git status --porcelain
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	_ "modernc.org/sqlite"
 )
@@ -112,7 +113,9 @@ func Open(dataDir string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode().Perm()&0o077 != 0 {
+	// Windows mode bits do not describe ACL access; a POSIX warning there
+	// incorrectly reports even private Windows directories as world-readable.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		log.Printf("warning: data directory %s permissions are %o; expected 0700", dataDir, info.Mode().Perm())
 	}
 
