@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Retention keeps mixed-age/incomplete traces whole, cooperatively compacts FTS/WAL and reclaims pages; legacy non-incremental DBs warn once instead of failing cleanup, and import-paused purges log and retry after one minute.
+- Schema v1→v2 builds dashboard/search indexes at startup. A 500k-span upgrade took 1.384s with 41.98 MiB peak WAL and 73.71 MiB peak additional DB/WAL/SHM space; plan at least 512 MiB extra data/temp filesystem headroom for a comparable DB, beyond backups. Larger metadata/databases need more; see README and the repeatable load report.
+- Docs gap audit (`2026-09-30-docs-gap.md`): verified configuration defaults and added missing route/auth documentation.
+
 ## 0.4.1 — 2026-09-28
 
 ### Added

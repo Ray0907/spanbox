@@ -9,6 +9,12 @@ import (
 const (
 	maxRetentionDays = int64((1<<63 - 1) / (24 * time.Hour))
 
+	// Defaults are selected by scripts/load-e2e.sh's 50k/500k sweep.
+	DefaultPurgeBatchSize = 10
+	DefaultFTSMergeEvery  = 256
+	maxPurgeBatchSize     = 200
+	maxFTSMergeEvery      = 1024
+
 	MaxBodyBytes        = 32 << 20
 	MaxConcurrentIngest = 4
 	ReadHeaderTimeout   = 10 * time.Second
@@ -30,6 +36,8 @@ type Config struct {
 	Port                  int
 	DataDir               string
 	RetentionDays         int
+	PurgeBatchSize        int
+	FTSMergeEvery         int
 	AuthToken             string
 	PricingFile           string
 	AnthropicUpstream     string
@@ -44,6 +52,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		Port:                  4318,
 		DataDir:               "./data",
 		RetentionDays:         30,
+		PurgeBatchSize:        DefaultPurgeBatchSize,
+		FTSMergeEvery:         DefaultFTSMergeEvery,
 		AuthToken:             getenv("AUTH_TOKEN"),
 		PricingFile:           getenv("PRICING_FILE"),
 		AnthropicUpstream:     getenv("ANTHROPIC_UPSTREAM"),
@@ -71,6 +81,25 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("RETENTION_DAYS must be between 0 and %d", maxRetentionDays)
 		}
 		cfg.RetentionDays = days
+	}
+	for _, tuning := range []struct {
+		key  string
+		dest *int
+		max  int
+	}{
+		{"PURGE_BATCH_SIZE", &cfg.PurgeBatchSize, maxPurgeBatchSize},
+		{"FTS_MERGE_EVERY", &cfg.FTSMergeEvery, maxFTSMergeEvery},
+	} {
+		if value := getenv(tuning.key); value != "" {
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return Config{}, fmt.Errorf("%s: %w", tuning.key, err)
+			}
+			if n < 1 || n > tuning.max {
+				return Config{}, fmt.Errorf("%s must be between 1 and %d", tuning.key, tuning.max)
+			}
+			*tuning.dest = n
+		}
 	}
 	return cfg, nil
 }

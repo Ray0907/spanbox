@@ -31,7 +31,7 @@ func TestExportSpansOrderAndBounds(t *testing.T) {
 		t.Fatalf("payload/null fields: %+v", got)
 	}
 	got = nil
-	if err := s.ExportSpans(ctx, TraceFilter{FromNs: 10, ToNs: 20}, func(span Span) error { got = append(got, span); return nil }); err != nil || len(got) != 3 {
+	if err := s.ExportSpans(ctx, TraceFilter{FromNs: 10, ToNs: 20}, func(span Span) error { got = append(got, span); return nil }); err != nil || len(got) != 2 || got[0].SpanID != spans[2].SpanID || got[1].SpanID != spans[1].SpanID {
 		t.Fatalf("bounded export: %+v err=%v", got, err)
 	}
 	stop := errors.New("stop")
@@ -41,31 +41,31 @@ func TestExportSpansOrderAndBounds(t *testing.T) {
 	}
 }
 
-func TestExportSpansMatchesTraceFiltersWithoutPageLimit(t *testing.T) {
+func TestExportSpansMatchesSpanFiltersWithoutPageLimit(t *testing.T) {
 	s := openTestStore(t)
 	ctx := context.Background()
 	first := testSpan(traceID(1), spanID(1), 1_000_000_000, 1_800_000_000)
 	first.Kind, first.RequestModel, first.ServiceName = "llm", "gpt-4o", "api"
 	first.SessionID, first.UserID, first.StatusCode = "session-a", "user-a", 2
-	// This child starts outside the filtered trace time range, but belongs in the export.
+	// This child belongs to a matching trace but must not pass the span filters.
 	child := testSpan(first.TraceID, spanID(2), 2_000_000_000, 2_100_000_000)
 	child.ParentSpanID = first.SpanID
 	other := testSpan(traceID(2), spanID(3), 3_000_000_000, 3_200_000_000)
 	other.Kind, other.RequestModel, other.ServiceName = "llm", "other", "worker"
 	also := first
 	also.TraceID, also.SpanID = traceID(3), spanID(4)
-	also.StartNs, also.EndNs = 1_100_000_000, 2_200_000_000
+	also.StartNs, also.EndNs, also.DurationMs = 1_100_000_000, 2_200_000_000, 1100
 	if err := s.InsertBatch(ctx, []Span{first, child, other, also}); err != nil {
 		t.Fatal(err)
 	}
-	base := TraceFilter{FromNs: 1_000_000_000, ToNs: 2_000_000_000, Model: "gpt-4o", Service: "api", ErrorsOnly: true, MinDurationMs: 1000, SessionID: "session-a", UserID: "user-a", Limit: 1, CursorStartNs: 1, CursorTraceID: first.TraceID}
+	base := TraceFilter{FromNs: 1_000_000_000, ToNs: 2_000_000_000, Model: "gpt-4o", Service: "api", ErrorsOnly: true, MinDurationMs: 800, SessionID: "session-a", UserID: "user-a", Limit: 1, CursorStartNs: 1, CursorTraceID: first.TraceID}
 	var got []Span
 	emit := func(span Span) error { got = append(got, span); return nil }
 	if err := s.ExportSpans(ctx, base, emit); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].SpanID != first.SpanID || got[1].SpanID != child.SpanID || got[2].SpanID != also.SpanID {
-		t.Fatalf("filtered trace spans: %+v", got)
+	if len(got) != 2 || got[0].SpanID != first.SpanID || got[1].SpanID != also.SpanID {
+		t.Fatalf("filtered spans: %+v", got)
 	}
 	for _, filter := range []TraceFilter{
 		{FromNs: 2_000_000_000, Model: "gpt-4o"}, {ToNs: 1_000_000_000}, {Model: "missing"}, {Service: "worker", ErrorsOnly: true},

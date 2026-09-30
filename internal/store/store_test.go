@@ -452,7 +452,7 @@ func TestPurgeReportsCommittedDeletesWhenVacuumFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	vacuumErr := errors.New("vacuum failed")
-	deleted, err := store.purge(context.Background(), 3, func(context.Context) error { return vacuumErr })
+	deleted, err := store.purge(context.Background(), 3, func(context.Context) error { return vacuumErr }, PurgeOptions{BatchSize: 2, MergeEvery: 1})
 	if deleted != 1 || !errors.Is(err, vacuumErr) {
 		t.Fatalf("deleted=%d err=%v", deleted, err)
 	}
@@ -464,9 +464,6 @@ func TestPurgeReportsCommittedDeletesWhenVacuumFails(t *testing.T) {
 
 func TestPurgeMultipleBatches(t *testing.T) {
 	store := openTestStore(t)
-	previous := purgeBatchSize
-	purgeBatchSize = 2
-	defer func() { purgeBatchSize = previous }()
 
 	var spans []Span
 	for i := 0; i < 5; i++ {
@@ -480,7 +477,7 @@ func TestPurgeMultipleBatches(t *testing.T) {
 	deleted, err := store.purge(context.Background(), 5, func(context.Context) error {
 		vacuumCalls++
 		return nil
-	})
+	}, PurgeOptions{BatchSize: 2, MergeEvery: 4})
 	if err != nil || deleted != 5 || vacuumCalls != 1 {
 		t.Fatalf("deleted=%d vacuumCalls=%d err=%v", deleted, vacuumCalls, err)
 	}

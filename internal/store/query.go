@@ -3,9 +3,12 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
+	"time"
 )
 
 type TraceFilter struct {
@@ -119,6 +122,10 @@ type TraceRow struct {
 }
 
 func buildTraceWhere(filter TraceFilter) (string, []any) {
+	return buildFilterWhere(filter, false)
+}
+
+func buildFilterWhere(filter TraceFilter, spans bool) (string, []any) {
 	query := "1=1"
 	var args []any
 	if filter.FromNs != 0 {
@@ -130,7 +137,11 @@ func buildTraceWhere(filter TraceFilter) (string, []any) {
 		args = append(args, filter.ToNs)
 	}
 	if filter.Model != "" {
-		query += ` AND trace_id IN (SELECT trace_id FROM spans WHERE request_model LIKE ? OR response_model LIKE ?)`
+		if spans {
+			query += ` AND (request_model LIKE ? OR response_model LIKE ?)`
+		} else {
+			query += ` AND trace_id IN (SELECT trace_id FROM spans WHERE request_model LIKE ? OR response_model LIKE ?)`
+		}
 		like := "%" + filter.Model + "%"
 		args = append(args, like, like)
 	}
@@ -139,7 +150,11 @@ func buildTraceWhere(filter TraceFilter) (string, []any) {
 		args = append(args, "%"+filter.Service+"%")
 	}
 	if filter.ErrorsOnly {
-		query += " AND has_error = 1"
+		if spans {
+			query += " AND status_code = 2"
+		} else {
+			query += " AND has_error = 1"
+		}
 	}
 	if filter.MinDurationMs > 0 {
 		query += " AND duration_ms >= ?"
@@ -307,8 +322,15 @@ type ModelRow struct {
 }
 
 func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardData, error) {
+	// Reuse one read snapshot/cache across the aggregates. Concurrent writer
+	// commits must not invalidate metadata between the three dashboard scans.
+	reader, err := s.r.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return DashboardData{}, err
+	}
+	defer reader.Rollback()
 	data := DashboardData{RangeFrom: fromNs / 1e9, RangeTo: toNs / 1e9}
-	rows, err := s.r.QueryContext(ctx, `SELECT strftime('%Y-%m-%d', start_ns/1e9, 'unixepoch') AS day,
+	rows, err := reader.QueryContext(ctx, `SELECT strftime('%Y-%m-%d', (`+spanDaySQL+`)*86400, 'unixepoch') AS day,
 		count(*), SUM(cost_usd), SUM(input_tokens), SUM(output_tokens), AVG(has_error)
 		FROM traces WHERE start_ns >= ? AND (? = 0 OR start_ns < ?) GROUP BY day ORDER BY day`, fromNs, toNs, toNs)
 	if err != nil {
@@ -366,7 +388,7 @@ func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardDat
 		data.ErrorRate = errorSum / float64(totalCount)
 	}
 
-	percentiles, err := s.dashboardPercentiles(ctx, fromNs, toNs)
+	percentiles, err := dashboardPercentiles(ctx, reader, fromNs, toNs)
 	if err != nil {
 		return DashboardData{}, err
 	}
@@ -376,10 +398,11 @@ func (s *Store) Dashboard(ctx context.Context, fromNs, toNs int64) (DashboardDat
 		data.DailyP95 = append(data.DailyP95, nullableFloat(values[1]))
 	}
 
-	modelRows, err := s.r.QueryContext(ctx, `SELECT COALESCE(NULLIF(response_model,''), request_model) AS model,
+	modelRows, err := reader.QueryContext(ctx, `SELECT COALESCE(NULLIF(response_model,''), request_model) AS model,
 		COUNT(*), SUM(input_tokens), SUM(output_tokens), SUM(cost_usd), AVG(duration_ms)
-		FROM spans WHERE kind IN ('llm','embedding') AND start_ns >= ? AND (? = 0 OR start_ns < ?)
-		AND COALESCE(NULLIF(response_model,''), request_model) <> '' GROUP BY model ORDER BY SUM(cost_usd) DESC, model`, fromNs, toNs, toNs)
+		FROM spans INDEXED BY spans_kind WHERE kind IN ('llm','embedding')
+		AND `+spanDaySQL+` >= ? AND start_ns >= ? AND (? = 0 OR start_ns < ?)
+		AND COALESCE(NULLIF(response_model,''), request_model) <> '' GROUP BY model ORDER BY SUM(cost_usd) DESC, model`, utcDay(fromNs), fromNs, toNs, toNs)
 	if err != nil {
 		return DashboardData{}, err
 	}
@@ -434,28 +457,43 @@ func validateDashboardCosts(data DashboardData) error {
 
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
-func (s *Store) dashboardPercentiles(ctx context.Context, fromNs, toNs int64) (map[string][2]sql.NullFloat64, error) {
-	rows, err := s.r.QueryContext(ctx, `WITH r AS (
-		SELECT strftime('%Y-%m-%d', start_ns/1e9, 'unixepoch') AS day, duration_ms,
-		ROW_NUMBER() OVER (PARTITION BY strftime('%Y-%m-%d', start_ns/1e9, 'unixepoch') ORDER BY duration_ms) AS rn,
-		COUNT(*) OVER (PARTITION BY strftime('%Y-%m-%d', start_ns/1e9, 'unixepoch')) AS n
-		FROM spans WHERE kind='llm' AND start_ns >= ? AND (? = 0 OR start_ns < ?)
-	) SELECT day,
-		MAX(CASE WHEN rn = (50*n+99)/100 THEN duration_ms END),
-		MAX(CASE WHEN rn = (95*n+99)/100 THEN duration_ms END)
-		FROM r GROUP BY day`, fromNs, toNs, toNs)
+// This expression also leads the covering spans_kind index (after kind).
+const spanDaySQL = `start_ns/86400000000000 - (start_ns<0 AND start_ns%86400000000000<>0)`
+
+func utcDay(ns int64) int64 {
+	return time.Unix(0, ns).UTC().Truncate(24*time.Hour).Unix() / 86400
+}
+
+func dashboardPercentiles(ctx context.Context, reader *sql.Tx, fromNs, toNs int64) (map[string][2]sql.NullFloat64, error) {
+	rows, err := reader.QueryContext(ctx, `SELECT `+spanDaySQL+` AS day,
+		json_group_array(duration_ms) FROM spans INDEXED BY spans_kind
+		WHERE kind='llm' AND day >= ? AND start_ns >= ? AND (? = 0 OR start_ns < ?)
+		GROUP BY day`, utcDay(fromNs), fromNs, toNs, toNs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	// One driver row per day, instead of one per span and two SQL window
+	// sorts. ponytail: O(n) daily RAM; external sort if a day outgrows RAM.
 	result := make(map[string][2]sql.NullFloat64)
 	for rows.Next() {
-		var day string
-		var p50, p95 sql.NullFloat64
-		if err := rows.Scan(&day, &p50, &p95); err != nil {
+		var day int64
+		var encoded string
+		if err := rows.Scan(&day, &encoded); err != nil {
 			return nil, err
 		}
-		result[day] = [2]sql.NullFloat64{p50, p95}
+		var values []float64
+		if err := json.Unmarshal([]byte(encoded), &values); err != nil {
+			return nil, err
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		sort.Float64s(values)
+		result[time.Unix(day*86400, 0).UTC().Format("2006-01-02")] = [2]sql.NullFloat64{
+			{Float64: values[(50*len(values)+99)/100-1], Valid: true},
+			{Float64: values[(95*len(values)+99)/100-1], Valid: true},
+		}
 	}
 	return result, rows.Err()
 }
@@ -493,17 +531,23 @@ func (s *Store) Search(ctx context.Context, phrase string, limit int, cursor ...
 		limit = 100
 	}
 	match := `"` + strings.ReplaceAll(phrase, `"`, `""`) + `"`
-	query := `SELECT s.trace_id, s.span_id, t.name, s.name, s.kind,
-		COALESCE(NULLIF(s.response_model,''), s.request_model), snippet(spans_fts, -1, '[', ']', '…', 16), s.start_ns
-		FROM spans_fts JOIN spans s ON s.id=spans_fts.rowid JOIN traces t ON t.trace_id=s.trace_id
-		WHERE spans_fts MATCH ?`
+	// Pick the page before loading bodies or computing snippets. A broad MATCH
+	// must not evaluate snippet() on every matching span just to sort its date.
+	query := `WITH page AS MATERIALIZED (
+		SELECT s.id, s.start_ns, s.span_id FROM spans s INDEXED BY spans_search
+		WHERE s.id IN (SELECT rowid FROM spans_fts WHERE spans_fts MATCH ?)`
 	args := []any{match}
 	if len(cursor) != 0 {
 		query += ` AND (s.start_ns, s.span_id) < (?, ?)`
 		args = append(args, cursor[0].StartNs, cursor[0].SpanID)
 	}
-	query += ` ORDER BY s.start_ns DESC, s.span_id DESC LIMIT ?`
-	args = append(args, limit)
+	query += ` ORDER BY s.start_ns DESC, s.span_id DESC LIMIT ?)
+		SELECT s.trace_id, s.span_id, t.name, s.name, s.kind,
+		COALESCE(NULLIF(s.response_model,''), s.request_model), snippet(spans_fts, -1, '[', ']', '…', 16), s.start_ns
+		FROM page p CROSS JOIN spans_fts ON spans_fts.rowid=p.id
+		JOIN spans s ON s.id=p.id JOIN traces t ON t.trace_id=s.trace_id
+		WHERE spans_fts MATCH ? ORDER BY s.start_ns DESC, s.span_id DESC`
+	args = append(args, limit, match)
 	rows, err := s.r.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"math"
+	"sync"
 
 	"github.com/Ray0907/spanbox/internal/config"
 )
@@ -50,13 +51,16 @@ func costInRange(cost float64) bool {
 }
 
 type Store struct {
-	w *sql.DB
-	r *sql.DB
-	u *sql.DB
+	w           *sql.DB
+	r           *sql.DB
+	u           *sql.DB
+	c           *sql.DB // checkpoints only; never application writes
+	retentionMu sync.Mutex
+	vacuumWarn  sync.Once
 }
 
 func (s *Store) Reader() *sql.DB { return s.r }
 
 func (s *Store) Close() error {
-	return errors.Join(s.r.Close(), s.u.Close(), s.w.Close())
+	return errors.Join(s.r.Close(), s.u.Close(), s.c.Close(), s.w.Close())
 }

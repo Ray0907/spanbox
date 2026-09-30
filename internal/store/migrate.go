@@ -94,6 +94,14 @@ CREATE TRIGGER spans_au AFTER UPDATE OF input_content, output_content, name ON s
   VALUES (new.id, new.input_content, new.output_content, new.name);
 END;
 INSERT INTO spans_fts(spans_fts) VALUES('rebuild');
+`, `
+-- Dashboard scans metadata, not the potentially large span bodies.
+DROP INDEX spans_kind;
+CREATE INDEX spans_kind ON spans(kind,
+  start_ns/86400000000000 - (start_ns<0 AND start_ns%86400000000000<>0),
+  start_ns, duration_ms, request_model, response_model, input_tokens, output_tokens, cost_usd);
+-- Broad FTS matches can sort row metadata without reading every span body.
+CREATE INDEX spans_search ON spans(start_ns DESC, span_id DESC);
 `}
 
 func Open(dataDir string) (*Store, error) {
@@ -168,7 +176,9 @@ func Open(dataDir string) (*Store, error) {
 	}
 
 	readerDSN := "file:" + filepath.ToSlash(path) + "?mode=ro&_pragma=query_only(ON)&_pragma=busy_timeout(5000)"
-	reader, err := sql.Open("sqlite", readerDSN)
+	// Cache the dashboard metadata working set; user SQL keeps its separate,
+	// default-sized pool. The cache is allocated lazily, capped per connection.
+	reader, err := sql.Open("sqlite", readerDSN+"&_pragma=cache_size(-65536)")
 	if err != nil {
 		return closeWriter(err)
 	}
@@ -190,5 +200,21 @@ func Open(dataDir string) (*Store, error) {
 		reader.Close()
 		return closeWriter(err)
 	}
-	return &Store{w: writer, r: reader, u: userReader}, nil
+	// PASSIVE checkpoint I/O must not occupy the single ingest writer. This
+	// connection only checkpoints. A capped wait at the WAL limit lets old
+	// snapshots drain without ever waiting as long as ingest's busy timeout.
+	checkpointer, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=busy_timeout(250)&_pragma=synchronous(NORMAL)")
+	if err == nil {
+		checkpointer.SetMaxOpenConns(1)
+		err = checkpointer.Ping()
+	}
+	if err != nil {
+		if checkpointer != nil {
+			checkpointer.Close()
+		}
+		userReader.Close()
+		reader.Close()
+		return closeWriter(err)
+	}
+	return &Store{w: writer, r: reader, u: userReader, c: checkpointer}, nil
 }

@@ -470,6 +470,21 @@ func parseOpenAIChunks(chunks []map[string]any) parsedResponse {
 	tools := map[int]map[string]any{}
 	sawChoice := false
 	for _, chunk := range chunks {
+		// Incomplete Responses streams have no response.completed event. Keep
+		// their response metadata and text rather than dropping the partial reply.
+		response := object(chunk["response"])
+		if id := text(response["id"]); id != "" {
+			result.id = id
+		}
+		if model := text(response["model"]); model != "" {
+			result.model = model
+		}
+		applyResponsesUsage(&result, object(response["usage"]))
+		if text(chunk["type"]) == "response.output_text.delta" {
+			// ponytail: partial text shares one assistant message; group by output_index if multi-item partial capture is needed.
+			sawChoice = true
+			content.WriteString(text(chunk["delta"]))
+		}
 		if id := text(chunk["id"]); id != "" {
 			result.id = id
 		}

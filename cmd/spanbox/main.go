@@ -45,7 +45,7 @@ func main() {
 		log.Print("warning: AUTH_TOKEN is not set; ingest and UI are unauthenticated")
 	}
 	if cfg.RetentionDays != 0 {
-		go runRetention(database, cfg.RetentionDays)
+		go runRetention(database, cfg.RetentionDays, store.PurgeOptions{BatchSize: cfg.PurgeBatchSize, MergeEvery: cfg.FTSMergeEvery})
 	}
 	proxyHandler, err := proxy.New(proxy.Config{
 		AnthropicUpstream:     cfg.AnthropicUpstream,
@@ -84,24 +84,26 @@ func main() {
 	}
 }
 
-func runRetention(database *store.Store, days int) {
-	purge := func() {
-		cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour).UnixNano()
-		deleted, err := database.Purge(context.Background(), cutoff)
-		if err != nil {
-			if deleted > 0 {
-				log.Printf("retention: deleted %d traces; cleanup failed: %v", deleted, err)
-			} else {
-				log.Printf("retention: %v", err)
-			}
-		} else if deleted > 0 {
-			log.Printf("retention: deleted %d traces", deleted)
+func runRetention(database *store.Store, days int, options store.PurgeOptions) {
+	for {
+		time.Sleep(retentionSweep(database, days, options))
+	}
+}
+
+func retentionSweep(database *store.Store, days int, options ...store.PurgeOptions) time.Duration {
+	cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour).UnixNano()
+	deleted, err := database.Purge(context.Background(), cutoff, options...)
+	if errors.Is(err, store.ErrRetentionPaused) {
+		return time.Minute
+	}
+	if err != nil {
+		if deleted > 0 {
+			log.Printf("retention: deleted %d traces; cleanup failed: %v", deleted, err)
+		} else {
+			log.Printf("retention: %v", err)
 		}
+	} else if deleted > 0 {
+		log.Printf("retention: deleted %d traces", deleted)
 	}
-	purge()
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
-	for range ticker.C {
-		purge()
-	}
+	return time.Hour
 }

@@ -154,7 +154,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	vendor, route, rest, ok := proxyRoute(r.URL.Path)
 	endpoint, exists := h.endpoints[route]
-	if !ok || !exists || rest == "" {
+	if !ok || !exists || rest == "" || vendor == "chatgpt" && rest != "codex/responses" {
 		writeError(w, http.StatusNotFound, "unknown proxy route")
 		return
 	}

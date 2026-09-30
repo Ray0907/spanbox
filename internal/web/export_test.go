@@ -165,14 +165,18 @@ func TestExportImportValidation(t *testing.T) {
 		{"zero start", []byte(`{"TraceID":"x","SpanID":"y"}`), 400},
 		{"zero end", []byte(`{"TraceID":"x","SpanID":"y","StartNs":1}`), 400},
 		{"extra JSON", append(append([]byte{}, line...), []byte(` {}`)...), 400},
-		{"oversized line", []byte(`{"Name":"` + strings.Repeat("x", 10<<20) + `"}`), 400},
-		{"oversized body", bytes.Repeat([]byte("\n"), config.MaxBodyBytes+1), 413},
+		{"large line missing ids", []byte(`{"Name":"` + strings.Repeat("x", 10<<20) + `"}`), 400},
+		// Imports bound individual lines, not the total body as OTLP does.
+		{"blank body above OTLP limit", bytes.Repeat([]byte("\n"), config.MaxBodyBytes+1), 200},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := exportRequest(h, "POST", "/import", "application/x-ndjson", tc.body)
 			if got.Code != tc.status {
 				t.Fatalf("status=%d body=%s", got.Code, got.Body.String())
+			}
+			if tc.status == 200 && strings.TrimSpace(got.Body.String()) != `{"imported":0}` {
+				t.Fatalf("blank import: %s", got.Body.String())
 			}
 		})
 	}

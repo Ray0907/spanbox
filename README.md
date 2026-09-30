@@ -35,6 +35,8 @@ All configuration is optional.
 | `PORT` | `4318` | HTTP listen port on all interfaces |
 | `DATA_DIR` | `./data` | Directory containing `spanbox.db` |
 | `RETENTION_DAYS` | `30` | Delete complete traces older than this; `0` disables retention |
+| `PURGE_BATCH_SIZE` | `10` | Complete traces per retention delete transaction; integer 1–200 |
+| `FTS_MERGE_EVERY` | `256` | Delete batches per explicit FTS merge step; integer 1–1024; automatic merges remain enabled |
 | `AUTH_TOKEN` | empty | Bearer token for ingest and login token for the UI |
 | `PRICING_FILE` | empty | Replacement LiteLLM model pricing JSON file |
 | `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Anthropic proxy upstream override |
@@ -44,6 +46,26 @@ All configuration is optional.
 | `GEMINI_UPSTREAM` | `https://generativelanguage.googleapis.com` | Gemini proxy upstream override |
 
 Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled.
+
+The upstream URL defaults above are applied by the proxy; `config.FromEnv` leaves unset upstream overrides empty.
+
+## HTTP routes and authentication
+
+When `AUTH_TOKEN` is unset, these routes require no authentication (except `/sql`, which is disabled). When it is set:
+
+| Route | Authentication and behavior |
+|---|---|
+| `GET /healthz`, `GET /api/public/health` | Public health checks; no token required |
+| `/login`, `/static/` | Public login form and static assets; `POST /login` exchanges the token for a session cookie |
+| `POST /`, `POST /v1/traces`, `POST /v1/logs`, `POST /v1/metrics` | Require `Authorization: Bearer <AUTH_TOKEN>`; metrics are accepted and discarded |
+| `POST /api/public/otel/v1/traces` | Requires Bearer auth or Basic auth with `AUTH_TOKEN` as the password; the username is ignored |
+| `GET /`, `/sessions`, `/search`, `/traces/`, `/spans/` | HTML pages require a login cookie (otherwise redirect to `/login`); `?format=json` also accepts Bearer auth and returns JSON 401 when unauthorized |
+| `/dashboard` | Requires a login cookie; otherwise redirects to `/login` |
+| `/dashboard/data` | Accepts Bearer auth or a login cookie; returns JSON 401 when unauthorized |
+| `/sql` | Requires a login cookie; Bearer auth alone does not grant access |
+| `GET /export` | Streams spans as `application/x-ndjson`, using the trace-list filters; requires Bearer auth or a login cookie, otherwise 401 |
+| `POST /import` | Accepts `application/x-ndjson` span records and returns an imported count; requires Bearer auth or a login cookie, otherwise 401 |
+| `/proxy/` | `/proxy/anthropic/...`, `/proxy/openai/...`, `/proxy/chatgpt/...` (Codex inference: `POST /proxy/chatgpt/codex/responses`), `/proxy/gemini/...`, and `/proxy/openai-compat/<name>/...` require `X-Spanbox-Token: <AUTH_TOKEN>` or `/proxy/t/<token>/<vendor>/...`; vendor credentials pass through unchanged, and spanbox headers are stripped before forwarding |
 
 ## Durability with Litestream
 
@@ -55,6 +77,22 @@ docker compose run --rm litestream restore -if-replica-exists -o /data/spanbox.d
 ```
 
 Keep a single writer: never run two spanbox instances against the same restored database file. Restore before spanbox starts because spanbox creates an empty database otherwise, which Litestream could replicate over the good replica; `-if-replica-exists` makes first deployment safe when no backup exists, and automated deployments should enforce restore-before-spanbox with an init container and `depends_on` ordering.
+
+## Database upgrades and retention maintenance
+
+Back up `spanbox.db` before upgrading. The schema v1→v2 upgrade builds dashboard/search indexes **before the HTTP server starts**. On the load fixture (500,000 spans, ~1.3 KiB input/output per span, short model names), startup migration took **1.384s**: the DB grew from **1,180.19 to 1,211.83 MiB**, WAL peaked at **41.98 MiB**, and peak additional DB/WAL/SHM space was **73.71 MiB**. Keep **at least 512 MiB extra free space** on the data filesystem and SQLite temporary-sort filesystem for a comparable 500k database (512 MiB total if they share a volume), **in addition to backup space**. This is a conservative planning allowance, not an upper bound: increase it for more spans or longer indexed model names, and allow startup probes time for migration. `scripts/load-e2e.sh` repeats the upgrade measurement; the full table is in `docs/superpowers/specs/2026-09-30-retention-perf-result.md`.
+
+Retention keeps small delete batches to protect ingest and periodically finishes FTS merge generations to retire pending delete postings during a purge. `scripts/load-e2e.sh` checks the chosen defaults at 50k and 500k spans, prints before/during/after search p95 and ingest p95/MAX, and records FTS segment counts over time. Use `scripts/load-e2e.sh -sweep` for batches 10/50/200 × merge intervals 1/256 (aggressive candidates can fail); `-merge-intervals 256` narrows that sweep, and `-purge-timeout 2m` rejects slow candidates sooner. Results and rejected settings are in `docs/superpowers/specs/2026-09-30-search-p95-during-purge-result.md`. Writer fairness is **whole-purge p95-based** (ingest p95 within 3× baseline), not a hard maximum or a per-window guarantee. A nominal 32-page merge turn is not a duration bound for large common terms: the original accepted run still had a 638ms ingest maximum. The load summary reports ingest MAX as informational only, with no maximum-latency failure threshold. Tuning ranges are safety caps, not performance guarantees; benchmark representative data rather than raising batch size blindly.
+
+On batch/merge/checkpoint errors, retention attempts FTS finalization and reclamation once on an independent context with a 30s timeout, preserving the original error and committed delete count (cleanup failures are joined). An expired purge deadline does not prevent this best-effort recovery. **Canceling the purge context for shutdown skips cleanup and interrupts recovery already running**, so shutdown does not wait out the 30s cleanup timeout. Normal completion still runs final reclamation; unsupported or failed cleanup may leave maintenance work for a later sweep.
+
+Retention skips during an active import are logged and retried one minute later, then return to hourly sweeps. Legacy databases without incremental auto-vacuum still delete expired traces successfully, but skip unsupported vacuum with one warning per opened Store when free pages remain. To enable shrinkage, stop spanbox, back up the DB, then use SQLite offline:
+
+```sh
+sqlite3 "${DATA_DIR:-./data}/spanbox.db" 'PRAGMA auto_vacuum=INCREMENTAL; VACUUM;'
+```
+
+Offline `VACUUM` has its own temporary-copy space requirement; do not count it as part of the index-upgrade allowance above.
 
 ## Capture without instrumentation (proxy)
 
