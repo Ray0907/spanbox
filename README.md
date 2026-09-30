@@ -18,7 +18,7 @@ Download a binary from the [releases page](https://github.com/Ray0907/spanbox/re
 
 ### Supported platforms
 
-Release binaries support **Linux amd64/arm64** (including Arch Linux and Arch-based Omarchy; AUR package [`spanbox-bin`](deploy/aur/PKGBUILD)), **macOS amd64/arm64**, and **Windows amd64**. On Windows, run `.\spanbox.exe` from PowerShell.
+Release binaries support **Linux amd64/arm64** (including Arch Linux and Arch-based Omarchy; the [`spanbox-bin` PKGBUILD](deploy/aur/PKGBUILD) is published to the AUR by the release workflow only when the `AUR_SSH_PRIVATE_KEY` secret is configured, and is not published at the moment, so install from the release binary), **macOS amd64/arm64**, and **Windows amd64**. On Windows, run `.\spanbox.exe` from PowerShell.
 
 [CI](.github/workflows/ci.yml) exercises Ubuntu amd64, an Arch Linux amd64 container, and Windows amd64 with Go vet, race-enabled tests and builds. Arch and Windows also run the full export/import round trip; Windows additionally launches the pure-Go release-style executable, ingests one OTLP span, reads it over HTTP and terminates it. The Arch container represents Omarchy's base distribution, not its desktop setup or AUR installation. Linux arm64 and macOS are published build targets, not runtime-tested by this CI workflow.
 
