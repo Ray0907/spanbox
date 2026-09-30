@@ -16,6 +16,14 @@ spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It 
 
 Download a binary from the [releases page](https://github.com/Ray0907/spanbox/releases), or use the container image below. There are no required environment variables; run `./spanbox` and open http://localhost:4318.
 
+### Supported platforms
+
+Release binaries support **Linux amd64/arm64** (including Arch Linux and Arch-based Omarchy; AUR package [`spanbox-bin`](deploy/aur/PKGBUILD)), **macOS amd64/arm64**, and **Windows amd64**. On Windows, run `.\spanbox.exe` from PowerShell.
+
+[CI](.github/workflows/ci.yml) exercises Ubuntu amd64, an Arch Linux amd64 container, and Windows amd64 with Go vet, race-enabled tests and builds. Arch and Windows also run the full export/import round trip; Windows additionally launches the pure-Go release-style executable, ingests one OTLP span, reads it over HTTP and terminates it. The Arch container represents Omarchy's base distribution, not its desktop setup or AUR installation. Linux arm64 and macOS are published build targets, not runtime-tested by this CI workflow.
+
+**Windows limitations:** protect `DATA_DIR` with Windows ACLs; POSIX 0600/0700 permission bits do not describe Windows access. Automated child-process cleanup uses forced termination because Go cannot send `os.Interrupt` to a Windows subprocess. CI proves process termination and data round trips, **not graceful Windows shutdown**; all other E2E assertions still run.
+
 ## Run with Docker
 
 Generate a token with at least 32 cryptographically random bytes, then start spanbox:
