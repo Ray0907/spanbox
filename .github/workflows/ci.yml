@@ -1,7 +1,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, ci-macos] # Temporary branch trigger; remove after green CI.
   pull_request:
 jobs:
   test:
@@ -119,3 +119,46 @@ jobs:
       - run: go test -race -count=1 ./...
       - run: CGO_ENABLED=0 go build ./cmd/spanbox
       - run: bash scripts/roundtrip-e2e.sh
+
+  macos:
+    name: macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Verify native macOS architecture
+        run: |
+          sw_vers
+          go version
+          ulimit -n
+          test "$(go env GOOS)" = darwin
+          test "$(go env GOARCH)" = '${{ matrix.arch }}'
+      - run: go vet ./...
+      - run: go test -race -count=1 -v ./...
+      - run: CGO_ENABLED=0 go build -o spanbox ./cmd/spanbox
+      - name: Export/import and real binary smoke with BSD userland
+        shell: bash
+        run: |
+          # Exclude Homebrew/GNU utilities, but keep the selected Go and Python.
+          export PATH="$(dirname "$(command -v go)"):$pythonLocation/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          for tool in bash mktemp sed date; do
+            command -v "$tool"
+            test "$(command -v "$tool")" = "/bin/$tool" || test "$(command -v "$tool")" = "/usr/bin/$tool"
+          done
+          python3 --version
+          bash scripts/roundtrip-e2e.sh
+          python3 scripts/unix-smoke.py ./spanbox
