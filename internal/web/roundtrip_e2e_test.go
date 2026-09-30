@@ -261,7 +261,10 @@ func TestImportE2ELargeFile(t *testing.T) {
 func TestImportE2EMalformedAndRetention(t *testing.T) {
 	h, db := newTestHandler(t, "")
 	s := httptest.NewServer(h)
-	defer s.Close()
+	// Cleanups run last-in first-out: the pipe registered below is closed
+	// before the server, so a failed assertion cannot leave Close waiting on
+	// an import handler that is still reading the pipe.
+	t.Cleanup(s.Close)
 	ctx := context.Background()
 	original := store.Span{TraceID: strings.Repeat("f", 32), SpanID: strings.Repeat("f", 16), Name: "existing", Kind: "other", StartNs: time.Now().UnixNano(), EndNs: time.Now().UnixNano() + 1}
 	if err := db.InsertBatch(ctx, []store.Span{original}); err != nil {
@@ -289,7 +292,7 @@ func TestImportE2EMalformedAndRetention(t *testing.T) {
 	if _, err := writer.Write(body.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for {
 		var count int
 		if err := db.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil {
@@ -316,7 +319,7 @@ func TestImportE2EMalformedAndRetention(t *testing.T) {
 	case resp = <-done:
 	case err := <-errCh:
 		t.Fatal(err)
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("import did not complete")
 	}
 	defer resp.Body.Close()

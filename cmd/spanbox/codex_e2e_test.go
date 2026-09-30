@@ -286,7 +286,8 @@ func TestCodexProxyE2E(t *testing.T) {
 	}
 	waitSpan := func(t *testing.T, mode string) store.Span {
 		t.Helper()
-		deadline := time.Now().Add(5 * time.Second)
+		// Async span capture is slow on shared macOS Intel runners under -race.
+		deadline := time.Now().Add(30 * time.Second)
 		for {
 			for _, span := range readSpans(t) {
 				var attrs map[string]any
