@@ -1,33 +1,28 @@
 # UI review fixes (2026-10-02)
 
-Source: interface review of HEAD 24c666b. Files: `internal/web/templates/*.html`, `internal/web/static/app.css`, `internal/web/static/app.js`. Keep project idiom: hand-written CSS with existing tokens, htmx, Go `html/template`. No new deps.
+Result record for commit `9739b71`. Source: an interface review of `24c666b` covering accessibility, layout, writing, typography, colors and UI polish.
 
-## Scope: do these, in order
+## What changed
 
-1. **Span tree selection collapses subtree, no disclosure cue** (HIGH) — `trace.html:20`, `app.css:527-545`.
-   - `summary` is `display:grid`, so the marker is gone; clicking a summary both selects (htmx) and toggles `<details>`.
-   - Move `hx-get`/`hx-target`/`hx-swap` onto an `<a class="tree-select" href="/spans/{trace}/{span}">` wrapping the span name inside the summary. Clicks on interactive content inside `summary` do not toggle.
-   - Restore a visible cue: `.tree-node>summary::before{content:"▸"}`, `.tree-node[open]>summary::before{content:"▾"}`; hide it (visibility) for leaf nodes with no children. Add a grid column for it.
-   - Update `app.js` `markSelectedSpan` so selection state still works (`htmx:beforeRequest` now fires from the link; use `closest('summary')`).
-2. **Panel visibility** (MEDIUM) — `app.css:484,501,820`. Desktop: `.span-panel{position:sticky;top:56px;max-height:calc(100vh - 72px);overflow:auto}`. Mobile (<=640px): swap with `show:#panel:top`.
-3. **Live region noise** (MEDIUM) — `trace.html:13`. Remove `aria-live` from `#panel`. Add stable empty `<p id="panel-status" role="status" class="visually-hidden">`; in `app.js` on `htmx:afterSwap` set its text to the new span name. Add `.visually-hidden` to `app.css`.
-4. **Waterfall svg** (MEDIUM) — `trace.html:26`: `aria-hidden="true"`, drop `role="img"` and `aria-label`.
-5. **Result count announce** (MEDIUM) — `traces_rows.html:2`: move count out of swapped section into a `role="status"` element updated via `hx-swap-oob`, same as `#export-link`.
-6. **Charts alt** (MEDIUM) — `dashboard.html:23-26`: add `role="img"` to each `.chart`.
-7. **Custom range fields** (MEDIUM) — `traces.html:21-26`, `sessions.html:20-21`: show From/To only when Range=Custom via CSS `:has(option[value=custom]:checked)`; label `From (UTC, RFC 3339)`.
-8. **Empty states** (MEDIUM) — `traces_rows.html:25`: `No traces match these filters. <a href="/">Clear filters</a>`. `sessions.html:37` similar. Do not add new page-data flags.
-9. **Type floor** (MEDIUM) — `app.css`: raise sizes below 0.8rem to 0.8rem; `pre` to 0.867rem.
-10. **Small** (LOW): `dashboard.html:11` "Update" -> "Apply"; breadcrumbs as `<ol>` with `aria-current="page"` and CSS separators; skip link + `id="main"`; `.table-wrap` scroll-shadow; `.topbar nav a{padding:0 8px}` at <=640px.
+Files: `internal/web/templates/*.html`, `internal/web/static/app.css`, `internal/web/static/app.js`.
 
-## Out of scope
-Color token changes (light-theme contrast) — design decision, do not touch.
+- **Span tree.** Selecting a span used to collapse its subtree, because the `summary` was `display:grid` (no disclosure marker) and the htmx request sat on the `summary` itself. Selection now goes through a link inside the summary, and an explicit chevron toggles the node.
+- **Trace panel.** Desktop: the panel is sticky and scrolls independently. Mobile: selecting a span scrolls the panel into view.
+- **Announcements.** `aria-live` was removed from `#panel`; a stable `role="status"` region announces only the selected span name. The trace result count is a status region updated out-of-band. The decorative waterfall is `aria-hidden`; dashboard charts have `role="img"`.
+- **Filters.** From/To are shown only for the Custom range and labeled `From (UTC, RFC 3339)`.
+- **Copy.** Empty states offer a "Clear filters" link; the dashboard button is "Apply" like the other pages.
+- **Typography.** Text below 12px was raised to 12px; `pre` is 13px.
+- **Navigation and scrolling.** Skip link and `id="main"`, `ol` breadcrumbs with `aria-current`, scroll-shadow on `.table-wrap`, tighter mobile nav padding.
 
-## Failure modes (write first, then code)
-- Link inside summary breaks keyboard: Enter on summary must still toggle, Enter on link must select.
-- Selected-row marking lost after swap.
-- `:has()` hides From/To on a page where Custom is preselected from the URL.
-- Leaf nodes show a chevron.
-- `go test ./...` must still pass (templates are parsed in tests).
+## How it was verified
 
-## Verify
-`go build ./... && go test ./...`; run server, check `/traces/<id>` at 1280px and 320px in a browser: click parent span -> subtree stays open, panel updates, chevron toggles separately.
+- `go build ./...`, `go vet ./internal/web`, `go test ./...` passed before commit.
+- Real browser run (headless, 1280px and 320px, sample trace): clicking a parent span keeps the subtree open and loads the panel; the chevron toggles separately; the status region reads the span name; the 320px nav fits; the custom-range fields appear only for Custom; empty-state, sessions and dashboard checks matched.
+- A second reviewer pass found no issues.
+
+## Not done / unverified
+
+- Light-theme contrast (input border 2.84:1, placeholder 3.87:1, waterfall bars down to 1.94:1) was reported but left alone; color is a design decision.
+- Screen-reader announcements were not tested with real assistive technology.
+- A fresh install with no filters still shows "match these filters" in the empty state.
+- `docs/screenshots/*` still show the old UI.
