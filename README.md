@@ -1,6 +1,6 @@
 # spanbox
 
-spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It accepts OTLP/HTTP protobuf or JSON on port 4318, stores complete span data in embedded SQLite, and serves trace, token, cost, latency, search, and read-only SQL views from the same port—without Postgres, ClickHouse, Redis, or object storage.
+spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It accepts OTLP/HTTP protobuf or JSON on port 4318 by default, stores normalized spans (including attributes, events, links, resource and scope) in embedded SQLite, and serves trace, token, cost, latency, search, and read-only SQL views from the same port—without Postgres, ClickHouse, Redis, or object storage.
 
 ![Trace detail: span tree with prompt and completion](docs/screenshots/trace.png)
 
@@ -32,7 +32,7 @@ Generate a token with at least 32 cryptographically random bytes, then start spa
 docker run -p 4318:4318 -v ./data:/data -e AUTH_TOKEN=$(openssl rand -hex 32) ghcr.io/ray0907/spanbox
 ```
 
-For a bind mount, create the directory first and restrict it to the container user (for example, `mkdir -m 700 data`). spanbox warns when an existing data directory is accessible by group or other users. The database file is created with mode `0600`.
+For a bind mount, create the directory first and restrict it to the container user (for example, `mkdir -m 700 data`). On POSIX systems, spanbox warns when an existing data directory is accessible by group or other users. The database file is created with mode `0600`.
 
 ## Configuration
 
@@ -40,9 +40,9 @@ All configuration is optional.
 
 | Environment variable | Default | Description |
 |---|---:|---|
-| `PORT` | `4318` | HTTP listen port on all interfaces |
+| `PORT` | `4318` | HTTP listen port on all interfaces; integer, with no configuration-level range check |
 | `DATA_DIR` | `./data` | Directory containing `spanbox.db` |
-| `RETENTION_DAYS` | `30` | Delete complete traces older than this; `0` disables retention |
+| `RETENTION_DAYS` | `30` | Delete complete traces older than this; integer 0–106751; `0` disables retention |
 | `PURGE_BATCH_SIZE` | `10` | Complete traces per retention delete transaction; integer 1–200 |
 | `FTS_MERGE_EVERY` | `256` | Delete batches per explicit FTS merge step; integer 1–1024; automatic merges remain enabled |
 | `AUTH_TOKEN` | empty | Bearer token for ingest and login token for the UI |
@@ -53,7 +53,7 @@ All configuration is optional.
 | `CHATGPT_UPSTREAM` | `https://chatgpt.com/backend-api` | ChatGPT-authenticated Codex proxy upstream override |
 | `GEMINI_UPSTREAM` | `https://generativelanguage.googleapis.com` | Gemini proxy upstream override |
 
-Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled.
+Without `AUTH_TOKEN`, ingest and the UI are open and the SQL console is disabled. Use `/proxy/<vendor>/...` in that mode; `/proxy/t/<token>/...` is only rewritten when authentication is enabled.
 
 The upstream URL defaults above are applied by the proxy; `config.FromEnv` leaves unset upstream overrides empty.
 
@@ -73,7 +73,7 @@ When `AUTH_TOKEN` is unset, these routes require no authentication (except `/sql
 | `/sql` | Requires a login cookie; Bearer auth alone does not grant access |
 | `GET /export` | Streams spans as `application/x-ndjson`, using the trace-list filters; requires Bearer auth or a login cookie, otherwise 401 |
 | `POST /import` | Accepts `application/x-ndjson` span records and returns an imported count; requires Bearer auth or a login cookie, otherwise 401 |
-| `/proxy/` | `/proxy/anthropic/...`, `/proxy/openai/...`, `/proxy/chatgpt/...` (Codex inference: `POST /proxy/chatgpt/codex/responses`), `/proxy/gemini/...`, and `/proxy/openai-compat/<name>/...` require `X-Spanbox-Token: <AUTH_TOKEN>` or `/proxy/t/<token>/<vendor>/...`; vendor credentials pass through unchanged, and spanbox headers are stripped before forwarding |
+| `/proxy/` | `/proxy/anthropic/...`, `/proxy/openai/...`, `/proxy/chatgpt/codex/responses` (the only ChatGPT path; inference is captured on POST), `/proxy/gemini/...`, and `/proxy/openai-compat/<name>/...` require `X-Spanbox-Token: <AUTH_TOKEN>` or `/proxy/t/<token>/<vendor>/...`; vendor credentials pass through unchanged, and spanbox headers are stripped before forwarding |
 
 ## Durability with Litestream
 
@@ -88,11 +88,11 @@ Keep a single writer: never run two spanbox instances against the same restored 
 
 ## Database upgrades and retention maintenance
 
-Back up `spanbox.db` before upgrading. The schema v1→v2 upgrade builds dashboard/search indexes **before the HTTP server starts**. On the load fixture (500,000 spans, ~1.3 KiB input/output per span, short model names), startup migration took **1.384s**: the DB grew from **1,180.19 to 1,211.83 MiB**, WAL peaked at **41.98 MiB**, and peak additional DB/WAL/SHM space was **73.71 MiB**. Keep **at least 512 MiB extra free space** on the data filesystem and SQLite temporary-sort filesystem for a comparable 500k database (512 MiB total if they share a volume), **in addition to backup space**. This is a conservative planning allowance, not an upper bound: increase it for more spans or longer indexed model names, and allow startup probes time for migration. `scripts/load-e2e.sh` repeats the upgrade measurement; the full table is in `docs/superpowers/specs/2026-09-30-retention-perf-result.md`.
+Back up `spanbox.db` before upgrading. The schema v1→v2 upgrade builds dashboard/search indexes **before the HTTP server starts**. On the load fixture (500,000 spans, ~1.3 KiB input/output per span, short model names), startup migration took **1.384s**: the DB grew from **1,180.19 to 1,211.83 MiB**, WAL peaked at **41.98 MiB**, and peak additional DB/WAL/SHM space was **73.71 MiB**. Keep **at least 512 MiB extra free space** on the data filesystem and SQLite temporary-sort filesystem for a comparable 500k database (512 MiB total if they share a volume), **in addition to backup space**. This is a conservative planning allowance, not an upper bound: increase it for more spans or longer indexed model names, and allow startup probes time for migration. The load driver in [`scripts/load/upgrade.go`](scripts/load/upgrade.go) repeats the upgrade measurement; the historical result table is not present at this HEAD.
 
-Retention keeps small delete batches to protect ingest and periodically finishes FTS merge generations to retire pending delete postings during a purge. `scripts/load-e2e.sh` checks the chosen defaults at 50k and 500k spans, prints before/during/after search p95 and ingest p95/MAX, and records FTS segment counts over time. Use `scripts/load-e2e.sh -sweep` for batches 10/50/200 × merge intervals 1/256 (aggressive candidates can fail); `-merge-intervals 256` narrows that sweep, and `-purge-timeout 2m` rejects slow candidates sooner. Results and rejected settings are in `docs/superpowers/specs/2026-09-30-search-p95-during-purge-result.md`. Writer fairness is **whole-purge p95-based** (ingest p95 within 3× baseline), not a hard maximum or a per-window guarantee. A nominal 32-page merge turn is not a duration bound for large common terms: the original accepted run still had a 638ms ingest maximum. The load summary reports ingest MAX as informational only, with no maximum-latency failure threshold. Tuning ranges are safety caps, not performance guarantees; benchmark representative data rather than raising batch size blindly.
+Retention keeps small delete batches to protect ingest and periodically finishes FTS merge generations to retire pending delete postings during a purge. The load driver in [`scripts/load/main.go`](scripts/load/main.go) checks the chosen defaults at 50k and 500k spans, prints before/during/after search p95 and ingest p95/MAX, and records FTS segment counts over time. Its `-sweep` flag selects batches 10/50/200 × merge intervals 1/256 (aggressive candidates can fail); `-merge-intervals 256` narrows that sweep, and `-purge-timeout 2m` rejects slow candidates sooner. [`scripts/load-e2e.sh`](scripts/load-e2e.sh) forwards these flags, but its final report-writing step reads a historical result file absent at this HEAD and will fail. To avoid that step, build spanbox and run `go run ./scripts/load -work <temporary-directory> -binary <absolute-path-to-spanbox>` with the desired flags. Writer fairness is **whole-purge p95-based** (ingest p95 within 3× baseline), not a hard maximum or a per-window guarantee. A nominal 32-page merge turn is not a duration bound for large common terms: the original accepted run still had a 638ms ingest maximum. The load summary reports ingest MAX as informational only, with no maximum-latency failure threshold. Tuning ranges are safety caps, not performance guarantees; benchmark representative data rather than raising batch size blindly.
 
-On batch/merge/checkpoint errors, retention attempts FTS finalization and reclamation once on an independent context with a 30s timeout, preserving the original error and committed delete count (cleanup failures are joined). An expired purge deadline does not prevent this best-effort recovery. **Canceling the purge context for shutdown skips cleanup and interrupts recovery already running**, so shutdown does not wait out the 30s cleanup timeout. Normal completion still runs final reclamation; unsupported or failed cleanup may leave maintenance work for a later sweep.
+On batch/merge/checkpoint errors, retention attempts FTS finalization and reclamation once on an independent context with a 30s timeout, preserving the original error and committed delete count (cleanup failures are joined). An expired purge deadline does not prevent this best-effort recovery. **Canceling a purge context skips cleanup and interrupts recovery already running**, without waiting out the 30s cleanup timeout. The CLI retention worker uses `context.Background()` and is not wired to shutdown cancellation. Normal completion still runs final reclamation; unsupported or failed cleanup may leave maintenance work for a later sweep.
 
 Retention skips during an active import are logged and retried one minute later, then return to hourly sweeps. Legacy databases without incremental auto-vacuum still delete expired traces successfully, but skip unsupported vacuum with one warning per opened Store when free pages remain. To enable shrinkage, stop spanbox, back up the DB, then use SQLite offline:
 
@@ -112,7 +112,7 @@ export GOOGLE_GEMINI_BASE_URL=http://localhost:4318/proxy/gemini
 export OPENAI_BASE_URL=http://localhost:4318/proxy/openai/v1
 ```
 
-When `AUTH_TOKEN` is set, Claude Code can send it as a custom header. Add the Herdr pane ID in the same shell setting to tag every trace without replacing Claude's conversation ID:
+When `AUTH_TOKEN` is set, Claude Code can send it as a custom header. Add the Herdr pane ID in the same shell setting to tag captured spans without replacing Claude's conversation ID:
 
 ```sh
 export ANTHROPIC_CUSTOM_HEADERS="X-Spanbox-Token: <token>,X-Spanbox-Session: $HERDR_PANE_ID"
@@ -149,9 +149,11 @@ export OPENAI_COMPAT_UPSTREAMS="vllm=http://localhost:18080/v1,local-ai=http://l
 export OPENAI_BASE_URL=http://localhost:4318/proxy/openai-compat/vllm
 ```
 
-Named routes reuse OpenAI inference parsing and have the form `/proxy/openai-compat/<name>/...`; `server.address` records that named upstream's host.
+Names must match `[a-z0-9-]+` (nonempty; leading or trailing hyphens are allowed); entries are not whitespace-trimmed, and a repeated name uses its last URL. Named routes reuse OpenAI inference parsing and have the form `/proxy/openai-compat/<name>/...`; the upstream base path is prepended to the requested suffix, and `server.address` records its hostname without the port.
 
-Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy sees more (full request and response, cache and thinking tokens), so disable the CLI telemetry when you use it.
+Captured inference routes are POSTs to Anthropic `/v1/messages`, OpenAI `/v1/chat/completions` or `/v1/responses`, ChatGPT `/codex/responses`, and Gemini `/v1beta/models/<model>:generateContent` or `:streamGenerateContent`. Named OpenAI-compatible routes also recognize `/chat/completions` and `/responses` without `/v1` in the proxy suffix. Other requests are relayed without capture, except that other ChatGPT paths are rejected.
+
+Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy captures parsed request/response messages, tool names and calls, and cache and thinking token counts—not complete raw request/response bodies—so disable the CLI telemetry when you use it.
 
 ## Export traces
 
@@ -239,7 +241,7 @@ Enable telemetry on AI SDK calls as documented for the SDK version you use.
 
 ### Verified end to end
 
-`examples/otel-python/emit.py` drives the real OpenTelemetry Python SDK (OTLP protobuf, gzip, batch export) against a running spanbox and produces agent, chat, and tool spans with token usage and cache reads:
+`examples/otel-python/emit.py` drives the real OpenTelemetry Python SDK (OTLP protobuf and batch export) against a running spanbox and produces agent, chat, and tool spans with token usage and cache reads:
 
 ```sh
 pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
@@ -250,18 +252,20 @@ On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. 
 
 ## JSON API
 
-Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. `/dashboard/data` is JSON without a format parameter. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>`; failures return `{"error": "..."}` with a 4xx status on these JSON routes. The HTML dashboard still requires a login cookie.
+Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. `/dashboard/data` is JSON without a format parameter. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>` or use a login cookie. Authentication failures return `{"error": "unauthorized"}` with status 401 on these JSON routes. The `?format=json` handlers return `{"error": "..."}` for validation/not-found (400/404) and store (500) errors; `/dashboard/data` instead returns plain-text handler errors (400/500), and unsupported methods need not return JSON. The HTML dashboard still requires a login cookie.
 
 | Route | Returns |
 |---|---|
-| `/?format=json` | Traces. Same filters as the UI: `range` (`15m`, `1h`, `24h`, `7d`, or `custom` with RFC3339 `from`/`to`), `errors=1`, `service`, `model`, `session`, `user`, `min_duration` (ms) |
-| `/sessions?format=json` | Sessions |
-| `/dashboard/data?range=24h` | Overview: PascalCase `TotalCost`, `TotalInput`, `TotalOutput`, `TraceCount`, `ErrorRate`, `Days`, `DailyCost`, `DailyP50`, `DailyP95`, `Models`, etc. |
+| `/?format=json` | Traces. Same filters as the UI: `range` (`15m`, `1h`, `24h`, `7d`, or `custom` with RFC3339 `from`/`to`), `errors=1`, `service`, `model`, `session`, `user`, `min_duration` (non-negative finite ms). Omitted `range` means all retained traces; custom `to` must be after `from` |
+| `/sessions?format=json` | Sessions; `range` and custom `from`/`to` as above (omitted `range` means all retained sessions) |
+| `/dashboard/data?range=24h` | `range` and custom `from`/`to` as above; default range is `24h`. Overview: PascalCase `TotalCost`, `TotalInput`, `TotalOutput`, `TraceCount`, `ErrorRate`, `Days`, `DailyCost`, `DailyP50`, `DailyP95`, `Models`, etc. |
 | `/search?format=json&q=...` | Full-text hits with `trace_id`, `span_id` and a snippet |
 | `/traces/{trace_id}?format=json` | Trace summary and flat span list with token, cost, status and `input_chars`/`output_chars`, without bodies |
 | `/spans/{trace_id}/{span_id}?format=json` | Span metadata and the first 2000 characters of `input`, `output` and `attributes` |
 
-Lists take `limit` (default 20, max 50) and return `next_cursor`; pass it back as `cursor` with the other parameters unchanged until it is `null`. Span fields are windows of `{"text", "total_chars", "next_offset"}`; read further with `field=input|output|attributes&offset=N&len=L` (`len` max 20000). Offsets count Unicode code points, so windows reassemble byte for byte in any script; a field whose stored bytes are not valid UTF-8 carries `"invalid_utf8": true`.
+Trace, session and search lists take `limit` (positive integer, default 20, clamped to max 50) and return `items` and `next_cursor`; pass the cursor back with the other parameters unchanged until it is `null`. Cursors are `<start_ns>:<trace_id>` for traces, `<last_ns>:<session_id>` for sessions, and `<start_ns>:<span_id>` for search.
+
+Span fields are windows with `text`, `total_chars` and `next_offset`; read further with `field=input|output|attributes&offset=N&len=L`. Omitting `field` returns all three fields. `offset` is a non-negative integer (default 0, no configured maximum); `len` is positive (default 2000, clamped to max 20000). An offset at or beyond the end returns empty text and `next_offset: null`. Offsets count Unicode code points, so valid UTF-8 windows reassemble byte for byte; invalid stored UTF-8 is replaced with Unicode replacement characters and flagged with `"invalid_utf8": true`.
 
 ```sh
 curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/?format=json&errors=1&range=24h&limit=10'
@@ -270,15 +274,15 @@ curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/spans/<trace_
 
 ## Agent skill
 
-[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read the overview and its own proxy-tagged session (`X-Spanbox-Session: $HERDR_PANE_ID`), then use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.
+[`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read the overview, filter traces and use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. Its own-session example needs a caveat at this HEAD: `X-Spanbox-Session` is stored as the `spanbox.session` span attribute, but does not populate the `session_id` column used by the `session` filter. Use the actual `session_id` returned by the API; the pane ID works only if it is also recorded as a recognized session ID. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.
 
 ## SQL console security
 
-`/sql` is available only when `AUTH_TOKEN` is set and only to an authenticated UI session. Queries run through a read-only SQLite connection with `query_only`, a tokenizer guard, a 5-second timeout, and strict result limits. SQLite's Go driver does not expose an engine-level authorizer, so this console is for trusted operators holding the token—not untrusted users.
+`/sql` is available only when `AUTH_TOKEN` is set and only to an authenticated UI session. Queries run through a read-only SQLite connection with `query_only` and a 5-second context timeout. The tokenizer guard permits one statement starting with `SELECT`, `WITH` or `EXPLAIN`, rejects forbidden mutation/maintenance keywords and dangerous function calls, and caps SQL text at 16 KiB. Results are limited to 1000 rows, 64 columns, 64 KiB per cell and 4 MiB of column/cell text (not an encoded HTTP-response size limit). SQLite's Go driver does not expose an engine-level authorizer, so this console is for trusted operators holding the token—not untrusted users.
 
 ## Update model pricing
 
-The embedded pricing table is LiteLLM's `model_prices_and_context_window.json`:
+LiteLLM's `model_prices_and_context_window.json` is stored at `internal/pricing/model_prices.json` and embedded by `internal/pricing/pricing.go` with `//go:embed model_prices.json`; `PRICING_FILE` replaces it at runtime:
 
 ```sh
 curl -o internal/pricing/model_prices.json https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
