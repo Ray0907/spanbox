@@ -1,5 +1,5 @@
 {{define "content"}}
-<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Traces</a><span>/</span><span>{{.Trace.Name}}</span></nav>
+<nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Traces</a></li><li aria-current="page">{{.Trace.Name}}</li></ol></nav>
 <section class="trace-heading">
   <div><h1>{{.Trace.Name}}</h1><p>{{.Trace.ServiceName}} · {{timeUTC .Trace.StartNs}}</p></div>
   <div class="trace-summary"><span>{{.Trace.SpanCount}} spans</span><span>{{tokens .Trace.InputTokens}} / {{tokens .Trace.OutputTokens}} tokens</span><span>{{money .Trace.CostUSD}}</span><span>{{duration .Trace.DurationMs}}</span></div>
@@ -10,20 +10,21 @@
     <div class="time-ruler" aria-label="Trace timeline">{{range .TimeLabels}}<span>{{.}}</span>{{end}}</div>
     {{range .Roots}}{{template "node" .}}{{end}}
   </section>
-  <section id="panel" class="span-panel" aria-live="polite">
+  <section id="panel" class="span-panel">
     {{if .Selected}}{{template "span" .Selected}}{{else}}<p class="empty">Select a span to inspect it.</p>{{end}}
   </section>
 </div>
+<p id="panel-status" role="status" class="visually-hidden"></p>
 {{end}}
 {{define "node"}}
-<details class="tree-node" open>
-  <summary class="kind-row {{.Span.Kind}}" hx-get="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-target="#panel" hx-swap="innerHTML">
+<details class="tree-node{{if not .Children}} is-leaf{{end}}" open>
+  <summary class="kind-row {{.Span.Kind}}">
     <span class="kind {{.Span.Kind}}">{{.Span.Kind}}</span>
-    <span class="tree-name">{{.Span.Name}}</span>
+    <span class="tree-name"><a class="tree-select" href="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-get="/spans/{{.Span.TraceID}}/{{.Span.SpanID}}" hx-target="#panel" hx-swap="innerHTML">{{.Span.Name}}</a></span>
     <span class="tree-model">{{spanModel .Span}}</span>
     <span class="tree-tokens">{{if or .Span.InputTokens .Span.OutputTokens}}{{tokens .Span.InputTokens}} / {{tokens .Span.OutputTokens}}{{end}}</span>
     <span class="tree-duration">{{duration .Span.DurationMs}}</span>
-    <svg class="waterfall" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="Starts at {{.OffsetPct}} percent; spans {{.WidthPct}} percent of trace"><rect class="waterfall-bar" x="{{.OffsetPct}}" width="{{.WidthPct}}" height="8"></rect></svg>
+    <svg class="waterfall" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="waterfall-bar" x="{{.OffsetPct}}" width="{{.WidthPct}}" height="8"></rect></svg>
   </summary>
   <div class="children">{{range .Children}}{{template "node" .}}{{end}}</div>
 </details>

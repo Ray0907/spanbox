@@ -18,10 +18,10 @@
       <option value="custom" {{if eq .Filter.Range "custom"}}selected{{end}}>Custom</option>
     </select>
   </label>
-  <label>From
+  <label class="custom-range">From (UTC, RFC 3339)
     <input name="from" type="text" value="{{.Filter.From}}" placeholder="2026-09-15T00:00:00Z">
   </label>
-  <label>To
+  <label class="custom-range">To (UTC, RFC 3339)
     <input name="to" type="text" value="{{.Filter.To}}" placeholder="2026-09-16T00:00:00Z">
   </label>
   <label>Model
@@ -42,5 +42,6 @@
   <label class="check"><input name="errors" type="checkbox" value="1" {{if .Filter.Errors}}checked{{end}}> Errors only</label>
   <button type="submit">Apply</button>
 </form>
+<div id="result-count" role="status" class="result-count">{{len .Rows}} shown</div>
 {{template "results" .}}
 {{end}}

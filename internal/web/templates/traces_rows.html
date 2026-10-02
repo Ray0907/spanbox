@@ -1,5 +1,4 @@
 {{define "results"}}<section id="trace-results">
-  <div class="result-count">{{len .Rows}} shown</div>
   <div class="table-wrap">
     <table class="trace-table">
       <thead><tr><th>Time</th><th>Name</th><th>Service</th><th>Models</th><th>Spans</th><th>Tokens in / out</th><th>Cost</th><th>Duration</th><th>Status</th></tr></thead>
@@ -7,7 +6,7 @@
     </table>
   </div>
   {{if .NextURL}}<nav class="pagination" aria-label="Pagination"><a class="button secondary" href="{{.NextURL}}">Next page</a></nav>{{end}}
-</section>{{if .Partial}}<a id="export-link" href="{{.ExportURL}}" hx-swap-oob="outerHTML">Export NDJSON</a>{{end}}{{end}}
+</section>{{if .Partial}}<div id="result-count" role="status" class="result-count" hx-swap-oob="innerHTML">{{len .Rows}} shown</div><a id="export-link" href="{{.ExportURL}}" hx-swap-oob="outerHTML">Export NDJSON</a>{{end}}{{end}}
 {{define "rows"}}<tbody id="trace-rows">
 {{range .Rows}}
 <tr>
@@ -22,6 +21,6 @@
   <td>{{if .HasError}}<span class="status error">Error</span>{{else}}<span class="status ok">OK</span>{{end}}</td>
 </tr>
 {{else}}
-<tr><td class="empty" colspan="9">No traces match these filters.</td></tr>
+<tr><td class="empty" colspan="9">No traces match these filters. <a href="/">Clear filters</a></td></tr>
 {{end}}
 </tbody>{{end}}

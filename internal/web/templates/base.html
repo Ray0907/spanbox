@@ -12,6 +12,7 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body data-section="{{.Section}}">
+  <a class="skip-link" href="#main">Skip to main content</a>
   <!--
   THESIS: A compact trace workbench where hierarchy and evidence outrank decoration.
   OWN-WORLD: Dark ink surfaces, luminous rose signals, square corners, and hairline structure.
@@ -29,7 +30,7 @@
     </nav>
     <span class="utc-note">Times in UTC</span>
   </header>
-  <main class="shell">
+  <main id="main" class="shell" tabindex="-1">
     {{template "content" .}}
   </main>
 </body>

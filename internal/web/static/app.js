@@ -1,5 +1,7 @@
 (() => {
-  const markSelectedSpan = summary => {
+  const markSelectedSpan = element => {
+    const summary = element.closest('summary');
+    if (!summary) return;
     document.querySelectorAll('.tree-node > summary[aria-current="true"]').forEach(row => {
       row.classList.remove('is-selected');
       row.removeAttribute('aria-current');
@@ -12,8 +14,21 @@
   if (firstSpan && document.querySelector('#panel .span-detail')) markSelectedSpan(firstSpan);
 
   document.addEventListener('htmx:beforeRequest', event => {
-    const summary = event.detail.elt.closest('.tree-node > summary');
-    if (summary) markSelectedSpan(summary);
+    const link = event.detail.elt.closest('.tree-select');
+    if (link) markSelectedSpan(link);
+  });
+
+  document.addEventListener('htmx:beforeSwap', event => {
+    if (event.detail.target.id === 'panel' && window.matchMedia('(max-width: 640px)').matches) {
+      event.detail.swapOverride = 'innerHTML show:#panel:top';
+    }
+  });
+
+  document.addEventListener('htmx:afterSwap', event => {
+    if (event.detail.target.id !== 'panel') return;
+    const status = document.getElementById('panel-status');
+    const name = document.querySelector('#panel .span-detail h2');
+    if (status && name) status.textContent = name.textContent;
   });
 
   const root = document.querySelector('[data-dashboard-endpoint]');
