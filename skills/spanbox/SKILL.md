@@ -22,7 +22,7 @@ Stop at the first rung that answers the question.
 1. **Overview** — cost, tokens, trace count, errors, daily latency and model breakdown for the last 24 hours.
    `q '/dashboard/data?range=24h'`
    Keys are PascalCase: `TotalCost`, `TotalInput`, `TotalOutput`, `TraceCount`, `ErrorRate`, `Days`, `DailyCost`, `DailyP50`, `DailyP95`, `Models`.
-2. **Your own session** — if the proxy tags calls with `X-Spanbox-Session: $HERDR_PANE_ID`, inspect only that pane's traces.
+2. **Your own session** — tag proxy calls with `X-Spanbox-Session: $HERDR_PANE_ID`, then inspect that pane's traces. A non-empty header sets the captured span's `session_id` and appears on the sessions page. It takes precedence over the vendor's conversation ID, which remains stored as `gen_ai.conversation.id`; without the header, session assignment is unchanged. Keep the tag consistent within a vendor conversation: trace filters and session grouping still use the earliest non-empty span session.
    `q "/?format=json&session=$HERDR_PANE_ID"`
 3. **Find traces** — narrow with filters before paging.
    `q '/?format=json&limit=10&range=24h&errors=1'`

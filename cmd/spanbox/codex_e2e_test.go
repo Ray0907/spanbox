@@ -295,8 +295,8 @@ func TestCodexProxyE2E(t *testing.T) {
 					t.Fatal(err)
 				}
 				if attrs["spanbox.session"] == "codex-e2e-"+mode {
-					if attrs["http.request.header.x-spanbox-session"] != "codex-e2e-"+mode {
-						t.Fatal("session header tag missing")
+					if span.SessionID != "codex-e2e-"+mode || attrs["http.request.header.x-spanbox-session"] != "codex-e2e-"+mode {
+						t.Fatalf("session header tag/ID mismatch: session_id=%q", span.SessionID)
 					}
 					if attrs["gen_ai.input.messages"] != string(inputMessages) || attrs["gen_ai.system_instructions"] != `"Be precise"` {
 						t.Fatal("decoded request input/instructions changed during capture")
@@ -349,6 +349,33 @@ func TestCodexProxyE2E(t *testing.T) {
 			}
 			checkUpstream(t, mode, body, encoding)
 			span := waitSpan(t, mode)
+			if mode == "plain" {
+				for _, path := range []string{"/?format=json&session=" + span.SessionID, "/sessions?format=json"} {
+					req, err := http.NewRequest(http.MethodGet, base+path, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					req.Header.Set("Authorization", "Bearer "+token)
+					response, err := client.Do(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var page struct {
+						Items []struct {
+							TraceID   string `json:"trace_id"`
+							SessionID string `json:"session_id"`
+						}
+					}
+					err = json.NewDecoder(response.Body).Decode(&page)
+					response.Body.Close()
+					if err != nil || response.StatusCode != http.StatusOK || len(page.Items) != 1 || page.Items[0].SessionID != span.SessionID {
+						t.Fatalf("session query %s: status=%d page=%+v err=%v", path, response.StatusCode, page, err)
+					}
+					if strings.HasPrefix(path, "/?") && page.Items[0].TraceID != span.TraceID {
+						t.Fatalf("session filter returned the wrong trace: %+v", page)
+					}
+				}
+			}
 			if span.ResponseModel != "codex-response-model" || span.InputTokens == nil || *span.InputTokens != 123 || span.OutputTokens == nil || *span.OutputTokens != 45 || span.CacheReadTokens == nil || *span.CacheReadTokens != 7 || span.StatusCode == 2 || !strings.Contains(span.OutputContent, "reply 世界") && mode != "large" {
 				t.Fatalf("response model/tokens/output/status mismatch: %+v", span)
 			}
