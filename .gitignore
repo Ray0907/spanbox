@@ -5,3 +5,6 @@ __pycache__/
 *.db-wal
 *.db-shm
 .gstack/
+e2e-mobile/node_modules/
+e2e-mobile/results.log
+e2e-mobile/server.log

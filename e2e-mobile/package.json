@@ -1,0 +1,10 @@
+{
+  "name": "spanbox-mobile-e2e",
+  "private": true,
+  "scripts": {
+    "test": "node mobile.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}
