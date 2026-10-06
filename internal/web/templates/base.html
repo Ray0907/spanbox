@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="color-scheme" content="light dark">
+  <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+  <meta name="theme-color" content="#111014" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fffdfd" media="(prefers-color-scheme: light)">
   <title>{{if .Title}}{{.Title}} · {{end}}spanbox</title>
   <link rel="stylesheet" href="/static/app.css">
   {{if .Charts}}<link rel="stylesheet" href="/static/uPlot.min.css">{{end}}
