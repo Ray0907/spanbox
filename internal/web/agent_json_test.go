@@ -458,3 +458,28 @@ func TestAgentJSONAuth(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentJSONSearchRelevance(t *testing.T) {
+	handler, _ := newTestHandler(t, "")
+	agentSeed(t, handler, 6, "needle")
+	page := agentGet(t, handler, "/search?format=json&q=needle&sort=relevance&limit=2")
+	if items := page["items"].([]any); len(items) != 2 {
+		t.Fatalf("want 2 items, got %d", len(items))
+	}
+	if page["next_cursor"] != nil {
+		t.Fatalf("relevance order has no cursor, got %v", page["next_cursor"])
+	}
+	recent := agentGet(t, handler, "/search?format=json&q=needle&sort=recent&limit=2")
+	if recent["next_cursor"] == nil {
+		t.Fatal("sort=recent keeps the default cursor")
+	}
+	for _, path := range []string{
+		"/search?format=json&q=needle&sort=bogus",
+		"/search?format=json&q=needle&sort=relevance&cursor=123:" + strings.Repeat("a", 16),
+	} {
+		resp := request(t, handler, http.MethodGet, path, "", "", nil)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("GET %s: want 400, got %d %s", path, resp.Code, resp.Body.String())
+		}
+	}
+}

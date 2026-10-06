@@ -31,6 +31,7 @@ Stop at the first rung that answers the question.
 4. **Or search content** — FTS over span input, output and name.
    `q '/search?format=json&limit=10&q=rate%20limit'`
    Items carry `trace_id`, `span_id` and a short `snippet`. The snippet often is the answer.
+   Set `sort=recent|relevance`. The default is `recent` (newest first). With `sort=relevance`, search returns only the top `limit` hits, ranked by bm25 over all matches. There is no next page (`next_cursor: null`). A `cursor` with `sort=relevance` causes HTTP 400. To see more, narrow the query instead of paging.
 5. **Trace outline** — span tree, no bodies.
    `q '/traces/<trace_id>?format=json'`
    Per span: `span_id`, `parent_span_id`, `name`, `kind` (`llm` `tool` `agent` `retrieval` `embedding` `other`), `model`, `start_offset_ms`, `duration_ms`, tokens, `cost_usd`, `status_code` (2 = error), `input_chars`, `output_chars`. Pick the span from this; use `*_chars` to judge how much reading it costs.

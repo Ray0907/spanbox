@@ -537,3 +537,118 @@ func TestPurge(t *testing.T) {
 		t.Fatalf("traces=%d spans=%d fts=%d", traces, spans, fts)
 	}
 }
+
+func TestSearchRankedOrdersByRelevanceNotTime(t *testing.T) {
+	store := openTestStore(t)
+	strong := testSpan(traceID(1), spanID(1), 1, 2)
+	strong.InputContent = "timeout timeout timeout"
+	weak := testSpan(traceID(2), spanID(2), 3, 4)
+	weak.InputContent = "a long unrelated prompt about many topics that mentions timeout once among lots of other words"
+	newest := testSpan(traceID(3), spanID(3), 5, 6)
+	newest.InputContent = "nothing relevant here"
+	if err := store.InsertBatch(context.Background(), []Span{strong, weak, newest}); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := store.SearchRanked(context.Background(), "timeout", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 2 || hits[0].SpanID != strong.SpanID || hits[1].SpanID != weak.SpanID {
+		t.Fatalf("want strong then weak, got %+v", hits)
+	}
+	if hits[0].Snippet == "" {
+		t.Fatal("ranked hit must carry a snippet")
+	}
+	limited, err := store.SearchRanked(context.Background(), "timeout", 1)
+	if err != nil || len(limited) != 1 || limited[0].SpanID != strong.SpanID {
+		t.Fatalf("limit 1: %+v %v", limited, err)
+	}
+	if hits, err := store.SearchRanked(context.Background(), "", 10); err != nil || hits != nil {
+		t.Fatalf("empty phrase: %+v %v", hits, err)
+	}
+	if hits, err := store.SearchRanked(context.Background(), `"hi" OR`, 10); err != nil || hits != nil {
+		t.Fatalf("literal phrase must not be parsed as FTS syntax: %+v %v", hits, err)
+	}
+}
+
+// rankedSpanID avoids makeHex, whose period of 16 would make spans collide and upsert.
+func rankedSpanID(i int) string { return fmt.Sprintf("%016x", i) }
+
+func seedRankedCorpus(t *testing.T, store *Store) {
+	t.Helper()
+	spans := make([]Span, 0, 30)
+	for i := 1; i <= 30; i++ {
+		span := testSpan(fmt.Sprintf("%032x", i), rankedSpanID(i), int64(i), int64(i)+1)
+		span.InputContent = strings.Repeat("timeout ", (i*7)%5+1) + strings.Repeat("filler ", i)
+		if i == 1 {
+			span.InputContent = "timeout timeout timeout timeout timeout"
+		}
+		spans = append(spans, span)
+	}
+	if err := store.InsertBatch(context.Background(), spans); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The ranked page must be the exact global top N: an oracle query that ranks every
+// match with bm25() and takes the first N, without the page/join shape under test.
+func TestSearchRankedIsExactGlobalTopN(t *testing.T) {
+	store := openTestStore(t)
+	seedRankedCorpus(t, store)
+	ctx := context.Background()
+	for _, limit := range []int{1, 5, 17, 30, 100} {
+		rows, err := store.r.QueryContext(ctx, `SELECT s.span_id FROM spans_fts f JOIN spans s ON s.id=f.rowid
+			WHERE spans_fts MATCH '"timeout"' ORDER BY bm25(spans_fts), f.rowid LIMIT ?`, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			want = append(want, id)
+		}
+		rows.Close()
+		hits, err := store.SearchRanked(ctx, "timeout", limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, hit := range hits {
+			got = append(got, hit.SpanID)
+		}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("limit %d differs from oracle\n got %v\nwant %v", limit, got, want)
+		}
+	}
+	if hits, _ := store.SearchRanked(ctx, "timeout", 1); hits[0].SpanID != rankedSpanID(1) {
+		t.Fatal("oldest and strongest match must rank first: nothing may exclude old spans")
+	}
+}
+
+// Equal scores must resolve by rowid, so the page boundary never depends on scan order.
+func TestSearchRankedTiesResolveByInsertionOrder(t *testing.T) {
+	store := openTestStore(t)
+	spans := make([]Span, 0, 8)
+	for i := 1; i <= 8; i++ {
+		span := testSpan(fmt.Sprintf("%032x", i), rankedSpanID(i), int64(i), int64(i)+1)
+		span.InputContent = "identical timeout body"
+		spans = append(spans, span)
+	}
+	if err := store.InsertBatch(context.Background(), spans); err != nil {
+		t.Fatal(err)
+	}
+	for run := 0; run < 5; run++ {
+		hits, err := store.SearchRanked(context.Background(), "timeout", 3)
+		if err != nil || len(hits) != 3 {
+			t.Fatalf("hits=%+v err=%v", hits, err)
+		}
+		for i, hit := range hits {
+			if hit.SpanID != rankedSpanID(i+1) {
+				t.Fatalf("tie order: position %d is %s", i, hit.SpanID)
+			}
+		}
+	}
+}

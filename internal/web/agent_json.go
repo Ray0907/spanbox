@@ -157,8 +157,18 @@ func (deps Deps) agentSearch(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, 400, err.Error())
 		return
 	}
+	sort := r.URL.Query().Get("sort")
+	if sort != "" && sort != "recent" && sort != "relevance" {
+		writeAgentError(w, 400, "invalid sort")
+		return
+	}
+	text := r.URL.Query().Get("cursor")
+	if sort == "relevance" && text != "" {
+		writeAgentError(w, 400, "sort=relevance does not take a cursor")
+		return
+	}
 	var cursor []store.SearchHit
-	if text := r.URL.Query().Get("cursor"); text != "" {
+	if text != "" {
 		start, spanID, err := agentCursor(text, 8)
 		if err != nil {
 			writeAgentError(w, 400, err.Error())
@@ -166,7 +176,12 @@ func (deps Deps) agentSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		cursor = []store.SearchHit{{StartNs: start, SpanID: spanID}}
 	}
-	rows, err := deps.Store.Search(r.Context(), r.URL.Query().Get("q"), limit+1, cursor...)
+	var rows []store.SearchHit
+	if sort == "relevance" {
+		rows, err = deps.Store.SearchRanked(r.Context(), r.URL.Query().Get("q"), limit)
+	} else {
+		rows, err = deps.Store.Search(r.Context(), r.URL.Query().Get("q"), limit+1, cursor...)
+	}
 	if err != nil {
 		writeAgentError(w, 500, err.Error())
 		return
