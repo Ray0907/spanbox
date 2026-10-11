@@ -26,9 +26,11 @@ type Deps struct {
 	Logf        func(string, ...any)
 	Proxy       http.Handler
 	ingestSlots chan struct{}
+	events      *eventBroadcaster
 }
 
 func NewHandler(deps Deps) http.Handler {
+	deps.events = &eventBroadcaster{}
 	if deps.Logf == nil {
 		deps.Logf = log.Printf
 	}
@@ -92,6 +94,7 @@ func NewHandler(deps Deps) http.Handler {
 	mux.HandleFunc("/spans/", deps.span)
 	mux.HandleFunc("/sessions", deps.sessions)
 	mux.HandleFunc("/dashboard/data", deps.dashboardData)
+	mux.HandleFunc("/events", deps.eventStream)
 	mux.HandleFunc("/dashboard", deps.dashboard)
 	mux.HandleFunc("/search", deps.search)
 	mux.HandleFunc("/sql", deps.sqlPage)

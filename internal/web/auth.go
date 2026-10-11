@@ -84,7 +84,7 @@ func authenticate(token string, next http.Handler) http.Handler {
 			return
 		}
 		agentRoute := r.URL.Path == "/" || r.URL.Path == "/sessions" || r.URL.Path == "/search" || strings.HasPrefix(r.URL.Path, "/traces/") || strings.HasPrefix(r.URL.Path, "/spans/")
-		agentJSON := r.URL.Path == "/dashboard/data" || agentRoute && r.URL.Query().Get("format") == "json"
+		agentJSON := r.URL.Path == "/events" || r.URL.Path == "/dashboard/data" || agentRoute && r.URL.Query().Get("format") == "json"
 		if agentJSON {
 			if provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tokenEqual(provided, token) {
 				next.ServeHTTP(w, r)

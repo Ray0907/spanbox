@@ -272,6 +272,20 @@ curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/?format=json&
 curl -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/spans/<trace_id>/<span_id>?format=json&field=output&offset=2000&len=4000'
 ```
 
+## Live events (SSE)
+
+`GET /events` is a read-only, live Server-Sent Events stream for successfully ingested OTLP spans (including adapted logs). With `AUTH_TOKEN` set, use a Bearer token or login cookie; unauthorized requests return JSON 401.
+
+```sh
+curl -N -H "Authorization: Bearer $AUTH_TOKEN" 'http://localhost:4318/events?min_duration=1000&min_cost=0.10'
+```
+
+- `error`: an ingested span has error status; JSON data contains `trace_id`, `span_id`, `status_code`.
+- `slow`: a span's `duration_ms` exceeds `min_duration` (milliseconds); data contains `trace_id`, `span_id`, `duration_ms`.
+- `cost`: a trace's stored aggregate `cost_usd` exceeds `min_cost` (USD); data contains `trace_id`, `span_id`, `cost_usd`. Emitted once per affected trace per batch, with the last ingested span's ID; upserts do not double-count cost.
+
+Thresholds must be finite, non-negative numbers. Omit a threshold to disable that event type; plain `/events` emits only errors. Comparisons are strict `>`, not `>=`, and qualifying ingests emit again even if already above a threshold. The stream sends a keepalive comment every 15 seconds. Delivery is best-effort: each client has a 32-event buffer; full buffers drop new events without blocking ingest. There is no replay, persistence, or broadcast from imports/proxy captures.
+
 ## Agent skill
 
 [`skills/spanbox/SKILL.md`](skills/spanbox/SKILL.md) teaches a coding agent (Claude Code, Codex, pi) to read the overview, filter traces and use the JSON API coarse to fine, following `next_cursor` and `next_offset` instead of loading whole prompts into context. A non-empty proxy header `X-Spanbox-Session` sets the captured span's `session_id`, so the session filter and sessions page find the tagged traces. This explicit tag takes precedence over the vendor's conversation ID, which remains stored as `gen_ai.conversation.id`; without the header, session assignment is unchanged. Keep the tag consistent within a vendor conversation: trace filters and session grouping still use the earliest non-empty span session. Copy the directory into the agent's skills folder (for Claude Code, `~/.claude/skills/spanbox`) and set `SPANBOX_URL` and, if auth is on, `SPANBOX_TOKEN`. `skills/spanbox/e2e.sh [bash|zsh]` runs every command in the skill against a freshly built binary.

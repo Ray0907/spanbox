@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Read-only `GET /events` SSE stream for live OTLP error, slow-span and trace-cost notifications, with Bearer/cookie authentication, bounded fan-out and 15-second keepalives.
 - `PURGE_BATCH_SIZE` (default 10, 1–200) and `FTS_MERGE_EVERY` (default 256, 1–1024) tune retention. Defaults keep `/search` p95 within 2x baseline and ingest p95 within 3x during a purge (500k spans: search 150ms baseline, 209ms during purge).
 - `scripts/roundtrip-e2e.sh` (export/import round trip across two fresh instances) and `scripts/load-e2e.sh` (retention, concurrent read/ingest and upgrade load check; opt-in, not part of `go test`).
 - End-to-end test for the ChatGPT-authenticated Codex proxy.

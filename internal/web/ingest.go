@@ -126,6 +126,7 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	deps.publishIngestEvents(r.Context(), spans)
 	if signal == signalLogs {
 		writeExportResponse(w, mediaType, &collectorlogspb.ExportLogsServiceResponse{})
 	} else {
