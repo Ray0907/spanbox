@@ -1,0 +1,53 @@
+{
+  "navigation": [
+    {
+      "title": "Get Started",
+      "items": [
+        { "title": "Overview", "path": "index.md" },
+        { "title": "Quickstart", "path": "quickstart.md" },
+        { "title": "How spanbox Works", "path": "how-spanbox-works.md" }
+      ]
+    },
+    {
+      "title": "Guides",
+      "items": [
+        {
+          "title": "Capture Traces",
+          "items": [
+            { "title": "Send OpenTelemetry Traces", "path": "ingest.md" },
+            { "title": "Capture with the Proxy", "path": "proxy.md" }
+          ]
+        },
+        {
+          "title": "Explore Traces",
+          "items": [
+            { "title": "Use the Web UI", "path": "web-ui.md" },
+            { "title": "Query the JSON API", "path": "json-api.md" },
+            { "title": "Watch Live Events", "path": "events.md" },
+            { "title": "Run SQL Queries", "path": "sql-console.md" },
+            { "title": "Give an Agent Access", "path": "agent-skill.md" }
+          ]
+        },
+        {
+          "title": "Operate spanbox",
+          "items": [
+            { "title": "Configure spanbox", "path": "configuration.md" },
+            { "title": "Run spanbox Safely", "path": "security.md" },
+            { "title": "Deploy and Back Up", "path": "deployment.md" },
+            { "title": "Retention and Upgrades", "path": "retention.md" },
+            { "title": "Move Data Between Instances", "path": "export-import.md" },
+            { "title": "Update Model Pricing", "path": "pricing.md" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        { "title": "Environment Variables", "path": "environment-variables.md" },
+        { "title": "HTTP Routes", "path": "http-routes.md" },
+        { "title": "Data Model", "path": "data-model.md" }
+      ]
+    }
+  ]
+}

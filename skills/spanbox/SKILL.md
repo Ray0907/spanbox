@@ -49,3 +49,13 @@ Stop at the first rung that answers the question.
 - `invalid_utf8: true` on a field means stored bytes were not valid UTF-8; the text shown is lossy.
 - Report findings as `trace_id/span_id` plus a one-line conclusion, not pasted bodies.
 - Investigation needs more than ~5 span reads: hand it to a subagent and take back only the conclusion.
+
+## Docs
+
+Read these only when the ladder above cannot answer, for example when a filter, route, or column is unclear. Fetch with `curl` or read in a spanbox checkout.
+
+- JSON API parameters and paging: `docs/json-api.md`
+- Table and column names for SQL: `docs/data-model.md`
+- Routes and authentication: `docs/http-routes.md`
+- Capture setup and the `X-Spanbox-Session` tag: `docs/proxy.md`, `docs/ingest.md`
+- Index: `docs/index.md`; base URL https://github.com/Ray0907/spanbox/tree/main/docs
