@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Ray0907/spanbox/internal/normalize"
+	"github.com/Ray0907/spanbox/internal/otlp"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 	"github.com/klauspost/compress/zstd"
@@ -25,6 +26,7 @@ import (
 
 const (
 	maxBodyBytes       = 32 << 20
+	maxToolCalls       = 1024
 	defaultIdleTimeout = 120 * time.Second
 )
 
@@ -61,6 +63,14 @@ type endpoint struct {
 	client *http.Client
 }
 
+type toolOrigin struct {
+	toolCall
+	traceID, spanID string
+	endNs           int64
+	firstResultNs   int64
+	hasResult       bool
+}
+
 type Handler struct {
 	endpoints    map[string]endpoint
 	logf         func(string, ...any)
@@ -71,6 +81,10 @@ type Handler struct {
 	version      string
 	wg           sync.WaitGroup
 	captureSlots chan struct{}
+	toolMu       sync.Mutex
+	toolCalls    map[string]toolOrigin
+	toolOrder    []string
+	nextTool     int
 }
 
 func New(cfg Config) (*Handler, error) {
@@ -205,14 +219,14 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, vendor, route, r
 	inference, captureBody := h.classifyRequest(vendor, route, rest, r, body)
 	response, err := endpoint.client.Do(upstream)
 	if err != nil {
-		h.writeUpstreamError(w, r, vendor, rest, endpoint, captureBody, start, inference, err)
+		h.writeUpstreamError(w, r, vendor, route, rest, endpoint, captureBody, start, inference, err)
 		return
 	}
 	defer response.Body.Close()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	streamed := h.stream(w, response, start, inference)
 	if inference {
-		h.captureAsync(Exchange{Vendor: vendor, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: captureBody, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
+		h.captureAsync(Exchange{Vendor: vendor, Route: route, Path: rest, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: captureBody, ResponseHeaders: response.Header, ResponseBody: streamed.body, StatusCode: streamed.status, StartNs: start.UnixNano(), EndNs: streamed.endNs, TTFBMs: streamed.ttfbMs})
 	}
 }
 
@@ -234,7 +248,7 @@ func (h *Handler) classifyRequest(vendor, route, path string, r *http.Request, b
 	return true, decoded
 }
 
-func (h *Handler) writeUpstreamError(w http.ResponseWriter, r *http.Request, vendor, path string, endpoint endpoint, body []byte, start time.Time, inference bool, err error) {
+func (h *Handler) writeUpstreamError(w http.ResponseWriter, r *http.Request, vendor, route, path string, endpoint endpoint, body []byte, start time.Time, inference bool, err error) {
 	status := http.StatusBadGateway
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
@@ -243,7 +257,7 @@ func (h *Handler) writeUpstreamError(w http.ResponseWriter, r *http.Request, ven
 	responseBody := errorBody(http.StatusText(status))
 	writeJSON(w, status, responseBody)
 	if inference {
-		h.captureAsync(Exchange{Vendor: vendor, Path: path, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
+		h.captureAsync(Exchange{Vendor: vendor, Route: route, Path: path, ServerAddress: endpoint.base.Hostname(), RequestHeaders: captureHeaders(r.Header), RequestBody: body, ResponseBody: responseBody, StatusCode: status, StartNs: start.UnixNano(), EndNs: time.Now().UnixNano()})
 	}
 }
 
@@ -352,7 +366,8 @@ func (h *Handler) capture(exchange Exchange) {
 	if h.store == nil {
 		return
 	}
-	raw, err := Parse(exchange, h.version)
+	request, response := decodeExchange(exchange)
+	raw, err := parseExchange(exchange, h.version, request, response)
 	if err != nil {
 		h.logf("parse proxy span: %v", err)
 		if raw.TraceID == "" {
@@ -373,9 +388,66 @@ func (h *Handler) capture(exchange Exchange) {
 			span.CostUSD, span.CostSource = &cost, "pricing"
 		}
 	}
-	if err := h.store.InsertBatch(context.Background(), []store.Span{span}); err != nil {
+	spans := []store.Span{span}
+	for _, rawTool := range h.toolSpans(exchange, raw, request, response) {
+		tool, err := normalize.Span(rawTool, h.logf)
+		if err != nil {
+			h.logf("normalize proxy tool span: %v", err)
+			continue
+		}
+		spans = append(spans, tool)
+	}
+	if err := h.store.InsertBatch(context.Background(), spans); err != nil {
 		h.logf("insert proxy span: %v", err)
 	}
+}
+
+func (h *Handler) toolSpans(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse) []otlp.RawSpan {
+	results := toolResults(exchange, request)
+	calls := toolCalls(array(response.outputMessages), len(array(request["contents"])))
+	h.toolMu.Lock()
+	defer h.toolMu.Unlock()
+	var spans []otlp.RawSpan
+	for _, result := range results {
+		key := toolKey(exchange.route(), chat, result.id)
+		origin, ok := h.toolCalls[key]
+		if ok {
+			if result.name == "" {
+				result.name = origin.name
+			}
+			if result.arguments == nil {
+				result.arguments = origin.arguments
+			}
+			if !origin.hasResult {
+				origin.firstResultNs, origin.hasResult = chat.StartNs, true
+				h.toolCalls[key] = origin
+			}
+		}
+		span := toolSpan(exchange.route(), result, chat)
+		if ok {
+			span.TraceID, span.ParentSpanID = origin.traceID, origin.spanID
+			span.StartNs, span.EndNs = min(origin.endNs, origin.firstResultNs), origin.firstResultNs
+		}
+		spans = append(spans, span)
+	}
+	for id, call := range calls {
+		key := toolKey(exchange.route(), chat, id)
+		if _, ok := h.toolCalls[key]; ok {
+			continue
+		}
+		if h.toolCalls == nil {
+			h.toolCalls = make(map[string]toolOrigin)
+		}
+		if len(h.toolOrder) < maxToolCalls {
+			h.toolOrder = append(h.toolOrder, key)
+		} else {
+			delete(h.toolCalls, h.toolOrder[h.nextTool])
+			h.toolOrder[h.nextTool] = key
+			h.nextTool = (h.nextTool + 1) % maxToolCalls
+		}
+		h.toolCalls[key] = toolOrigin{toolCall: call, traceID: chat.TraceID, spanID: chat.SpanID, endNs: chat.EndNs}
+	}
+	return spans
 }
 
 func captureHeaders(headers http.Header) http.Header {

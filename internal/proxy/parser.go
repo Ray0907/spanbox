@@ -17,6 +17,7 @@ import (
 
 type Exchange struct {
 	Vendor          string
+	Route           string
 	Path            string
 	ServerAddress   string
 	RequestHeaders  http.Header
@@ -27,6 +28,13 @@ type Exchange struct {
 	StartNs         int64
 	EndNs           int64
 	TTFBMs          float64
+}
+
+func (e Exchange) route() string {
+	if e.Route != "" {
+		return e.Route
+	}
+	return e.Vendor
 }
 
 type parsedResponse struct {
@@ -52,8 +60,18 @@ var storedRequestHeaders = map[string]bool{
 	"x-spanbox-session":   true,
 }
 
-func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
+func decodeExchange(exchange Exchange) (map[string]any, parsedResponse) {
 	request := decodeObject(exchange.RequestBody)
+	stream := requestBool(request, "stream") || strings.Contains(exchange.Path, ":streamGenerateContent")
+	return request, parseResponse(exchange.Vendor, stream, exchange.ResponseBody)
+}
+
+func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
+	request, response := decodeExchange(exchange)
+	return parseExchange(exchange, version, request, response)
+}
+
+func parseExchange(exchange Exchange, version string, request map[string]any, response parsedResponse) (otlp.RawSpan, error) {
 	attrs := map[string]any{
 		"spanbox.source":            "proxy",
 		"spanbox.proxy.ttfb_ms":     exchange.TTFBMs,
@@ -82,7 +100,6 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 	}
 
 	requestModel, sessionID, userID := requestAttributes(exchange, request, attrs)
-	response := parseResponse(exchange.Vendor, stream, exchange.ResponseBody)
 	if response.id == "" {
 		response.id = exchange.ResponseHeaders.Get("request-id")
 	}
@@ -135,10 +152,14 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 		}
 		spanSeed = hex.EncodeToString(random[:])
 	}
-	spanID := hash("spanbox-proxy-span"+spanSeed, 8)
+	scopeSession := exchange.RequestHeaders.Get("X-Spanbox-Session")
+	if scopeSession == "" {
+		scopeSession = sessionID
+	}
+	spanID := hash("spanbox-proxy-span"+jsonString([]string{exchange.route(), scopeSession, spanSeed}), 8)
 	traceSeed := spanID
-	if sessionID != "" {
-		traceSeed = sessionID
+	if scopeSession != "" {
+		traceSeed = scopeSession
 	}
 	statusCode := int32(0)
 	statusMessage := ""
@@ -159,6 +180,163 @@ func Parse(exchange Exchange, version string) (otlp.RawSpan, error) {
 		Events: []map[string]any{}, Links: []map[string]any{}, Resource: resource,
 		Scope: map[string]any{"name": "spanbox/proxy", "version": version, "attributes": map[string]any{}},
 	}, response.scanErr
+}
+
+type toolCall struct {
+	name      string
+	arguments any
+}
+
+type toolResult struct {
+	toolCall
+	id      string
+	result  any
+	isError bool
+}
+
+func geminiToolKey(name string, turn, ordinal int) string {
+	return "gemini_" + hash(jsonString([]any{name, turn, ordinal}), 16)
+}
+
+func toolCalls(messages []any, turn int) map[string]toolCall {
+	calls := map[string]toolCall{}
+	add := func(id, name string, arguments any) {
+		if id != "" && name != "" {
+			calls[id] = toolCall{name: name, arguments: arguments}
+		}
+	}
+	for i, value := range messages {
+		message := objectOf(value)
+		ordinals := map[string]int{}
+		if text(message["type"]) == "function_call" {
+			add(text(message["call_id"]), text(message["name"]), message["arguments"])
+		}
+		if role := text(message["role"]); role != "assistant" && role != "model" {
+			continue
+		}
+		for _, value := range array(message["content"]) {
+			block := objectOf(value)
+			if text(block["type"]) == "tool_use" {
+				add(text(block["id"]), text(block["name"]), block["input"])
+			}
+		}
+		for _, value := range array(message["tool_calls"]) {
+			call := objectOf(value)
+			function := objectOf(call["function"])
+			add(text(call["id"]), text(function["name"]), function["arguments"])
+		}
+		for _, value := range array(message["parts"]) {
+			function := objectOf(objectOf(value)["functionCall"])
+			if name := text(function["name"]); name != "" {
+				id := text(function["id"])
+				if id == "" {
+					id = geminiToolKey(name, turn+i, ordinals[name])
+				}
+				add(id, name, function["args"])
+				ordinals[name]++
+			}
+		}
+	}
+	return calls
+}
+
+func toolResults(exchange Exchange, request map[string]any) []toolResult {
+	messages := array(request["messages"])
+	if strings.HasSuffix(exchange.Path, "/responses") {
+		messages = array(request["input"])
+	} else if exchange.Vendor == "gemini" {
+		messages = array(request["contents"])
+	}
+	lastAssistant := -1
+	for i, value := range messages {
+		message := objectOf(value)
+		role := text(message["role"])
+		if role == "assistant" || role == "model" || text(message["type"]) == "function_call" {
+			lastAssistant = i
+		}
+	}
+	callMessages, turn := messages, 0
+	if exchange.Vendor == "gemini" && lastAssistant >= 0 {
+		callMessages, turn = messages[lastAssistant:lastAssistant+1], lastAssistant
+	}
+	calls := toolCalls(callMessages, turn)
+	var results []toolResult
+	seen := map[string]bool{}
+	add := func(key string, result any, isError bool) {
+		if key == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		results = append(results, toolResult{toolCall: calls[key], id: key, result: result, isError: isError})
+	}
+	ordinals := map[string]int{}
+	for _, value := range messages[lastAssistant+1:] {
+		message := objectOf(value)
+		if exchange.Vendor == "gemini" {
+			for _, value := range array(message["parts"]) {
+				response := objectOf(objectOf(value)["functionResponse"])
+				if name := text(response["name"]); name != "" {
+					key := text(response["id"])
+					if key == "" {
+						key = geminiToolKey(name, lastAssistant, ordinals[name])
+					}
+					if _, ok := calls[key]; !ok {
+						calls[key] = toolCall{name: name}
+					}
+					_, isError := objectOf(response["response"])["error"]
+					add(key, response["response"], isError)
+					ordinals[name]++
+				}
+			}
+		} else if exchange.Vendor == "anthropic" && text(message["role"]) == "user" {
+			for _, value := range array(message["content"]) {
+				block := objectOf(value)
+				if text(block["type"]) == "tool_result" {
+					isError, _ := block["is_error"].(bool)
+					add(text(block["tool_use_id"]), block["content"], isError)
+				}
+			}
+		} else if text(message["role"]) == "tool" {
+			add(text(message["tool_call_id"]), message["content"], false)
+		} else if text(message["type"]) == "function_call_output" {
+			add(text(message["call_id"]), message["output"], false)
+		}
+	}
+	return results
+}
+
+func toolKey(vendor string, chat otlp.RawSpan, id string) string {
+	session := text(chat.Attrs["spanbox.session"])
+	if session == "" {
+		session = text(chat.Attrs["gen_ai.conversation.id"])
+	}
+	return jsonString([]string{vendor, session, id})
+}
+
+func toolSpan(vendor string, result toolResult, chat otlp.RawSpan) otlp.RawSpan {
+	attrs := map[string]any{
+		"spanbox.source":             "proxy",
+		"gen_ai.operation.name":      "execute_tool",
+		"gen_ai.tool.name":           result.name,
+		"gen_ai.tool.call.id":        result.id,
+		"gen_ai.tool.call.arguments": result.arguments,
+		"gen_ai.tool.call.result":    result.result,
+	}
+	for _, key := range []string{"gen_ai.provider.name", "spanbox.session", "gen_ai.conversation.id", "user.id"} {
+		if value, ok := chat.Attrs[key]; ok {
+			attrs[key] = value
+		}
+	}
+	seed := toolKey(vendor, chat, result.id)
+	span := otlp.RawSpan{
+		TraceID: hash("spanbox-proxy-tool-trace"+seed, 16), SpanID: hash("spanbox-proxy-tool-span"+seed, 8),
+		Name: strings.TrimSpace("execute_tool " + result.name), StartNs: chat.StartNs, EndNs: chat.StartNs,
+		Attrs: attrs, Events: []map[string]any{}, Links: []map[string]any{}, Resource: chat.Resource, Scope: chat.Scope,
+	}
+	if result.isError {
+		span.StatusCode = 2
+	}
+	return span
 }
 
 func providerOperation(vendor string) (string, string) {
@@ -233,6 +411,17 @@ func requestAttributes(exchange Exchange, request map[string]any, attrs map[stri
 	if names := toolNames(exchange.Vendor, request["tools"]); len(names) > 0 {
 		attrs["gen_ai.tool.definitions"] = jsonString(map[string]any{"count": len(names), "names": names})
 	}
+	if sessionID == "" {
+		for _, value := range []any{request["session_id"], request["conversation_id"], request["conversation"], request["session"], objectOf(request["metadata"])["session_id"]} {
+			sessionID = text(value)
+			if sessionID == "" {
+				sessionID = text(objectOf(value)["id"])
+			}
+			if sessionID != "" {
+				break
+			}
+		}
+	}
 	return model, sessionID, userID
 }
 
@@ -276,15 +465,35 @@ func parseStream(vendor string, body []byte) parsedResponse {
 		result = parseGeminiChunks(chunks)
 	default:
 		completed := false
+		var items []any
 		for _, chunk := range chunks {
-			if text(chunk["type"]) == "response.completed" {
+			switch text(chunk["type"]) {
+			case "response.output_item.done":
+				items = append(items, chunk["item"])
+			case "response.completed":
 				result = parseResponsesCompleted(chunk)
 				completed = true
-				break
 			}
 		}
 		if !completed {
 			result = parseOpenAIChunks(chunks)
+		} else if len(items) > 0 {
+			var output []any
+			seen := map[string]bool{}
+			for _, value := range append(array(result.outputMessages), items...) {
+				item := objectOf(value)
+				if len(item) == 0 {
+					continue
+				}
+				if id := text(item["id"]); id != "" {
+					if seen[id] {
+						continue
+					}
+					seen[id] = true
+				}
+				output = append(output, item)
+			}
+			result.outputMessages = output
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -433,7 +642,7 @@ func parseGeminiChunks(chunks []map[string]any) parsedResponse {
 			for _, part := range array(content["parts"]) {
 				partObject := cloneObject(objectOf(part))
 				delete(partObject, "thoughtSignature")
-				if len(partObject) > 0 && !(len(partObject) == 1 && text(partObject["text"]) == "") {
+				if len(partObject) > 0 && !(len(partObject) == 1 && partObject["text"] == "") {
 					parts = append(parts, partObject)
 				}
 			}

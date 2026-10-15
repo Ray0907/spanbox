@@ -83,6 +83,17 @@ Other requests are relayed without capture, except other ChatGPT paths, which ar
 
 The proxy records parsed request and response messages, tool names and calls, and cache and thinking token counts. It does not record complete raw bodies. A client disconnect mid-stream keeps the partial Responses output.
 
+## Tool spans
+
+The proxy derives `execute_tool <name>` spans from tool results after the last assistant/model turn: Anthropic `tool_result`, OpenAI chat `role=tool`, OpenAI/ChatGPT Responses `function_call_output`, and Gemini `functionResponse`. Names and arguments come from matching calls in the same request history; results become the span's output, and Anthropic `is_error` or an explicit Gemini `response.error` field marks an error.
+
+Span identity is deterministic, scoped by vendor (including the configured OpenAI-compatible route), session, and call ID. Session uses `X-Spanbox-Session`, then the vendor conversation/session ID, then empty. Gemini uses supplied `functionCall.id` / `functionResponse.id` values when present, preserving identity across pruned history and pairing reordered results by ID. Without an ID, it falls back to the issuing turn's position in `contents`, the function name, and its ordinal among calls with that name in the turn; this fallback requires stable history positions across retries. A best-effort cache links results to their issuing model span and measures the gap to the first observed result, clamped to zero for overlapping streams; retries do not extend that duration. It also supplies missing names and arguments for output-only Responses continuations.
+
+Known limits:
+- Correlation uses a mutex-protected, in-memory cache of 1,024 issuing calls, evicted FIFO; it is not persisted.
+- After a restart or eviction, or when capture order flips, a tool span may be an orphan with no parent and zero duration.
+- A replay after a restart may add one extra orphan with the same span ID but a different trace ID; the original linked span remains unchanged.
+
 ## Pitfalls
 
 - **Double capture.** If Gemini CLI telemetry also points at spanbox while `GOOGLE_GEMINI_BASE_URL` uses the proxy, every call is recorded twice. Pick one path per tool.

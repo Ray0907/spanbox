@@ -13,10 +13,441 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Ray0907/spanbox/internal/otlp"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 	"github.com/klauspost/compress/zstd"
 )
+
+func testToolSpans(h *Handler, exchange Exchange, chat otlp.RawSpan) []otlp.RawSpan {
+	request, response := decodeExchange(exchange)
+	return h.toolSpans(exchange, chat, request, response)
+}
+
+func TestToolExtractionUsesDecodedMessages(t *testing.T) {
+	h, err := New(Config{Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, EndNs: 200, RequestBody: []byte("{}"), ResponseBody: []byte(`{"id":"issue","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`)}
+	request, response := decodeExchange(issue)
+	chat, err := parseExchange(issue, "", request, response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue.RequestBody, issue.ResponseBody = []byte("invalid"), []byte("invalid")
+	chat.Attrs["gen_ai.output.messages"] = "invalid"
+	h.toolSpans(issue, chat, request, response)
+	result := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, StartNs: 800, RequestBody: []byte(`{"input":[{"type":"function_call_output","call_id":"a","output":"ok"}]}`)}
+	request, response = decodeExchange(result)
+	chat, err = parseExchange(result, "", request, response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result.RequestBody = []byte("invalid")
+	spans := h.toolSpans(result, chat, request, response)
+	if len(spans) != 1 || spans[0].ParentSpanID == "" || spans[0].Name != "execute_tool bash" || spans[0].Attrs["gen_ai.tool.call.result"] != "ok" {
+		t.Fatalf("decoded data was not reused: %+v", spans)
+	}
+}
+
+func BenchmarkParseAndToolsNoTools8MiB(b *testing.B) {
+	large := strings.Repeat("x", 8<<20)
+	for _, side := range []string{"request", "response"} {
+		b.Run(side, func(b *testing.B) {
+			exchange := Exchange{Vendor: "openai", Path: "/v1/chat/completions", StatusCode: 200, RequestBody: []byte(`{"messages":[{"role":"user","content":"small"}]}`), ResponseBody: []byte(`{"id":"reply","choices":[{"message":{"role":"assistant","content":"small"}}]}`)}
+			if side == "request" {
+				exchange.RequestBody = []byte(`{"messages":[{"role":"user","content":"` + large + `"}]}`)
+			} else {
+				exchange.ResponseBody = []byte(`{"id":"reply","choices":[{"message":{"role":"assistant","content":"` + large + `"}}]}`)
+			}
+			h, err := New(Config{Logf: b.Logf})
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.SetBytes(8 << 20)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				request, response := decodeExchange(exchange)
+				chat, err := parseExchange(exchange, "", request, response)
+				if err != nil {
+					b.Fatal(err)
+				}
+				h.toolSpans(exchange, chat, request, response)
+			}
+		})
+	}
+}
+
+func TestCaptureToolSpans(t *testing.T) {
+	tests := []struct {
+		name, vendor, path, response, history string
+	}{
+		{"anthropic", "anthropic", "/v1/messages", `{"id":"issuing","content":[{"type":"tool_use","id":"a","name":"bash","input":{"cmd":"ls"}}]}`, `{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"bash","input":{"cmd":"ls"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"file.txt"}]}]}`},
+		{"anthropic stream", "anthropic", "/v1/messages", "data: {\"type\":\"message_start\",\"message\":{\"id\":\"issuing\"}}\n\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"a\",\"name\":\"bash\",\"input\":{}}}\n\n", `{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"file.txt"}]}]}`},
+		{"openai", "openai", "/v1/chat/completions", `{"id":"issuing","choices":[{"message":{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]}}]}`, `{"messages":[{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"file.txt"}]}`},
+		{"openai stream", "openai", "/v1/chat/completions", "data: {\"id\":\"issuing\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"bash\",\"arguments\":\"{}\"}}]}}]}\n\n", `{"messages":[{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"file.txt"}]}`},
+		{"responses", "openai", "/v1/responses", `{"id":"issuing","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`, `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`},
+		{"responses output only", "openai", "/v1/responses", `{"id":"issuing","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`, `{"previous_response_id":"issuing","input":[{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`},
+		{"chatgpt output only", "chatgpt", "/codex/responses", `{"id":"issuing","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`, `{"previous_response_id":"issuing","input":[{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`},
+		{"gemini", "gemini", "/v1beta/models/test:generateContent", `{"responseId":"issuing","candidates":[{"content":{"parts":[{"functionCall":{"name":"bash","args":{}}}]}}]}`, `{"contents":[{"role":"model","parts":[{"functionCall":{"name":"bash","args":{}}}]},{"role":"user","parts":[{"functionResponse":{"name":"bash","response":{"out":"file.txt"}}}]}]}`},
+		{"gemini stream", "gemini", "/v1beta/models/test:streamGenerateContent", "data: {\"responseId\":\"issuing\",\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"bash\",\"args\":{}}}]}}]}\n\n", `{"contents":[{"role":"model","parts":[{"functionCall":{"name":"bash","args":{}}}]},{"role":"user","parts":[{"functionResponse":{"name":"bash","response":{"out":"file.txt"}}}]}]}`},
+		{"responses stream", "chatgpt", "/codex/responses", "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"issuing\",\"output\":[{\"type\":\"function_call\",\"call_id\":\"a\",\"name\":\"bash\",\"arguments\":\"{}\"}]}}\n\n", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, err := store.Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			h, err := New(Config{Store: db, Logf: t.Logf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := `{}`
+			if strings.Contains(tt.name, "stream") {
+				request = `{"stream":true}`
+			}
+			issuing := Exchange{Vendor: tt.vendor, Path: tt.path, RequestBody: []byte(request), ResponseBody: []byte(tt.response), StatusCode: 200, StartNs: 100, EndNs: 200}
+			h.capture(issuing)
+			chat, err := Parse(issuing, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := Exchange{Vendor: tt.vendor, Path: tt.path, RequestBody: []byte(tt.history), ResponseBody: []byte(`{"id":"final"}`), StatusCode: 200, StartNs: 800, EndNs: 900}
+			h.capture(result)
+			result.StartNs, result.EndNs = 1600, 1700
+			h.capture(result) // A replay must not extend the first observed tool duration.
+			var count int
+			if err := db.Reader().QueryRow(`SELECT count(*) FROM spans WHERE kind='tool'`).Scan(&count); err != nil || count != 1 {
+				t.Fatalf("tool count=%d err=%v", count, err)
+			}
+			var traceID, parentID, name, callID, input, output string
+			var start, end int64
+			if err := db.Reader().QueryRow(`SELECT trace_id, parent_span_id, name, tool_call_id, start_ns, end_ns, input_content, output_content FROM spans WHERE kind='tool'`).Scan(&traceID, &parentID, &name, &callID, &start, &end, &input, &output); err != nil {
+				t.Fatal(err)
+			}
+			wantID := "a"
+			if tt.vendor == "gemini" {
+				wantID = geminiToolKey("bash", 0, 0)
+			}
+			if traceID != chat.TraceID || parentID != chat.SpanID || name != "execute_tool bash" || callID != wantID || start != 200 || end != 800 || input == "" || !strings.Contains(output, "file.txt") {
+				t.Fatalf("tool: trace=%s parent=%s name=%s call=%s time=%d..%d input=%s output=%s", traceID, parentID, name, callID, start, end, input, output)
+			}
+		})
+	}
+}
+
+func TestCaptureScopedTools(t *testing.T) {
+	db, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	h, err := New(Config{Store: db, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, vendor := range []string{"openai", "anthropic"} {
+		for _, session := range []string{"one", "two"} {
+			for _, header := range []bool{false, true} {
+				body, response := `{"messages":[]}`, `{"id":"origin","choices":[{"message":{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]}}]}`
+				history := `{"messages":[{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"ok"}]}`
+				path := "/v1/chat/completions"
+				if vendor == "anthropic" {
+					path = "/v1/messages"
+					response = `{"id":"origin","content":[{"type":"tool_use","id":"a","name":"bash","input":{}}]}`
+					history = `{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"ok"}]}]}`
+				}
+				headers := http.Header{}
+				scope := session
+				if header {
+					scope += "-header"
+					headers.Set("X-Spanbox-Session", scope)
+				}
+				body = strings.TrimSuffix(body, "}") + fmt.Sprintf(`,"session_id":%q}`, session)
+				history = strings.TrimSuffix(history, "}") + fmt.Sprintf(`,"session_id":%q}`, session)
+				h.capture(Exchange{Vendor: vendor, Path: path, RequestHeaders: headers, RequestBody: []byte(body), ResponseBody: []byte(response), StatusCode: 200, StartNs: 100, EndNs: 200})
+				h.capture(Exchange{Vendor: vendor, Path: path, RequestHeaders: headers, RequestBody: []byte(history), ResponseBody: []byte(`{"id":"final"}`), StatusCode: 200, StartNs: 800, EndNs: 900})
+				var parent string
+				if err := db.Reader().QueryRow("SELECT parent_span_id FROM spans WHERE kind='tool' AND provider=? AND session_id=?", vendor, scope).Scan(&parent); err != nil || parent == "" {
+					t.Fatalf("%s/%s parent=%s err=%v", vendor, scope, parent, err)
+				}
+			}
+		}
+	}
+	var count, identities int
+	if err := db.Reader().QueryRow("SELECT count(*),count(DISTINCT span_id) FROM spans WHERE kind='tool'").Scan(&count, &identities); err != nil || count != 8 || identities != 8 {
+		t.Fatalf("count=%d identities=%d err=%v", count, identities, err)
+	}
+}
+
+func TestGeminiIssuingTurns(t *testing.T) {
+	db, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	h, err := New(Config{Store: db, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := map[string]any{"role": "user", "parts": []any{map[string]any{"text": "run twice"}}}
+	model := map[string]any{"role": "model", "parts": []any{map[string]any{"functionCall": map[string]any{"name": "bash", "args": map[string]any{"cmd": "ls"}}}}}
+	result := map[string]any{"role": "user", "parts": []any{map[string]any{"functionResponse": map[string]any{"name": "bash", "response": map[string]any{"out": "ok"}}}}}
+	contents := []any{user}
+	exchange := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", RequestHeaders: http.Header{"X-Spanbox-Session": {"same"}}, StatusCode: 200, StartNs: 100, EndNs: 200}
+	for turn := 0; turn < 2; turn++ {
+		exchange.RequestBody = []byte(jsonString(map[string]any{"contents": contents}))
+		exchange.ResponseBody = []byte(jsonString(map[string]any{"responseId": fmt.Sprintf("issue_%d", turn), "candidates": []any{map[string]any{"content": model}}}))
+		h.capture(exchange)
+		contents = append(contents, model, result)
+		exchange.StartNs, exchange.EndNs = exchange.EndNs+100, exchange.EndNs+200
+		exchange.RequestBody = []byte(jsonString(map[string]any{"contents": contents}))
+		exchange.ResponseBody = []byte(fmt.Sprintf(`{"responseId":"result_%d"}`, turn))
+		h.capture(exchange)
+		exchange.StartNs, exchange.EndNs = exchange.EndNs+100, exchange.EndNs+200
+	}
+	var count, ids, parents int
+	if err := db.Reader().QueryRow("SELECT count(*),count(DISTINCT span_id),count(DISTINCT parent_span_id) FROM spans WHERE kind='tool' AND parent_span_id<>''").Scan(&count, &ids, &parents); err != nil || count != 2 || ids != 2 || parents != 2 {
+		t.Fatalf("executions=%d ids=%d parents=%d err=%v", count, ids, parents, err)
+	}
+}
+
+func TestGeminiNativeIDsSurvivePrunedHistory(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stream=%v", stream), func(t *testing.T) {
+			h, err := New(Config{Logf: t.Logf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			issue := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", StatusCode: 200, RequestHeaders: http.Header{"X-Spanbox-Session": {"native"}}, EndNs: 200, RequestBody: []byte(`{"contents":[{"role":"user","parts":[{"text":"old"}]},{"role":"model","parts":[{"text":"old reply"}]},{"role":"user","parts":[{"text":"run"}]}]}`), ResponseBody: []byte(`{"responseId":"issuing","candidates":[{"content":{"role":"model","parts":[{"functionCall":{"id":"call-a","name":"bash","args":{"cmd":"one"}}},{"functionCall":{"id":"call-b","name":"bash","args":{"cmd":"two"}}}]}}]}`)}
+			if stream {
+				issue.Path = "/v1beta/models/test:streamGenerateContent"
+				issue.ResponseBody = []byte("data: " + string(issue.ResponseBody) + "\n\n")
+			}
+			chat, err := Parse(issue, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			testToolSpans(h, issue, chat)
+			// All issuing history is gone; only native IDs can recover the right arguments.
+			result := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", StatusCode: 200, RequestHeaders: issue.RequestHeaders, StartNs: 800, RequestBody: []byte(`{"contents":[{"role":"user","parts":[{"functionResponse":{"id":"call-b","name":"bash","response":{"out":"second"}}},{"functionResponse":{"id":"call-a","name":"bash","response":{"out":"first"}}}]}]}`)}
+			raw, err := Parse(result, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			spans := testToolSpans(h, result, raw)
+			if len(spans) != 2 {
+				t.Fatalf("spans=%+v", spans)
+			}
+			for i, want := range []struct{ id, cmd string }{{"call-b", "two"}, {"call-a", "one"}} {
+				span := spans[i]
+				if span.Attrs["gen_ai.tool.call.id"] != want.id || jsonString(span.Attrs["gen_ai.tool.call.arguments"]) != jsonString(map[string]any{"cmd": want.cmd}) || span.TraceID != chat.TraceID || span.ParentSpanID != chat.SpanID || span.StartNs != 200 || span.EndNs != 800 {
+					t.Fatalf("native/pruned call %d: %+v", i, span)
+				}
+			}
+			// A later retry with full history must still address those same executions.
+			request := decodeObject(issue.RequestBody)
+			contents := array(request["contents"])
+			contents = append(contents, map[string]any{"role": "model", "parts": array(parseResponse("gemini", stream, issue.ResponseBody).outputMessages)[0].(map[string]any)["parts"]})
+			contents = append(contents, array(decodeObject(result.RequestBody)["contents"])...)
+			result.RequestBody = []byte(jsonString(map[string]any{"contents": contents}))
+			result.StartNs = 1600
+			raw, err = Parse(result, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			replayed := testToolSpans(h, result, raw)
+			if len(replayed) != len(spans) {
+				t.Fatalf("replayed spans=%+v", replayed)
+			}
+			for i := range spans {
+				if replayed[i].SpanID != spans[i].SpanID || replayed[i].ParentSpanID != spans[i].ParentSpanID || replayed[i].StartNs != spans[i].StartNs || replayed[i].EndNs != spans[i].EndNs {
+					t.Fatal("native retry changed identity, parent, or first timing")
+				}
+			}
+		})
+	}
+}
+
+func TestCompatToolScopes(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if bytes.Contains(body, []byte("function_call_output")) {
+			fmt.Fprint(w, `{"id":"final"}`)
+			return
+		}
+		name := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")[0]
+		fmt.Fprintf(w, `{"id":"same_reply","output":[{"type":"function_call","call_id":"a","name":%q,"arguments":"{}"}]}`, name)
+	}))
+	defer upstream.Close()
+	db, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	h, err := New(Config{Store: db, Logf: t.Logf, OpenAICompatUpstreams: "ua=" + upstream.URL + "/ua,ub=" + upstream.URL + "/ub"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"ua", "ub"} {
+		for _, body := range []string{`{"model":"test","input":"run"}`, `{"model":"test","input":[{"type":"function_call_output","call_id":"a","output":"ok"}]}`} {
+			r := httptest.NewRequest(http.MethodPost, "/proxy/openai-compat/"+route+"/responses", strings.NewReader(body))
+			r.Header.Set("X-Spanbox-Session", "same")
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			h.Wait()
+			if w.Code != 200 {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		}
+	}
+	var count, ids, parents, names int
+	if err := db.Reader().QueryRow("SELECT count(*),count(DISTINCT span_id),count(DISTINCT parent_span_id),count(DISTINCT tool_name) FROM spans WHERE kind='tool' AND parent_span_id<>''").Scan(&count, &ids, &parents, &names); err != nil || count != 2 || ids != 2 || parents != 2 || names != 2 {
+		t.Fatalf("tools=%d ids=%d parents=%d names=%d err=%v", count, ids, parents, names, err)
+	}
+}
+
+func TestToolCacheOverlappingStream(t *testing.T) {
+	h, err := New(Config{Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, EndNs: 1000, ResponseBody: []byte(`{"id":"issuing","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`)}
+	chat, err := Parse(issue, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testToolSpans(h, issue, chat)
+	result := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, StartNs: 800, RequestBody: []byte(`{"input":[{"type":"function_call_output","call_id":"a","output":"ok"}]}`)}
+	for _, start := range []int64{800, 1600} {
+		result.StartNs = start
+		raw, err := Parse(result, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		spans := testToolSpans(h, result, raw)
+		if len(spans) != 1 || spans[0].ParentSpanID != chat.SpanID || spans[0].StartNs != 800 || spans[0].EndNs != 800 {
+			t.Fatalf("overlap/retry=%+v", spans)
+		}
+	}
+}
+
+func TestToolCacheFIFOAndFirstResult(t *testing.T) {
+	h, err := New(Config{Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= maxToolCalls; i++ {
+		exchange := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, EndNs: int64(i + 1), ResponseBody: []byte(fmt.Sprintf(`{"id":"reply_%d","output":[{"type":"function_call","call_id":"call_%d","name":"bash","arguments":"{}"}]}`, i, i))}
+		chat, err := Parse(exchange, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		testToolSpans(h, exchange, chat)
+	}
+	if len(h.toolCalls) != maxToolCalls || len(h.toolOrder) != maxToolCalls {
+		t.Fatalf("cache=%d order=%d", len(h.toolCalls), len(h.toolOrder))
+	}
+	result := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, StartNs: 8000, EndNs: 8100, RequestBody: []byte(`{"input":[{"type":"function_call","call_id":"call_0","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"call_0","output":"ok"}]}`)}
+	chat, err := Parse(result, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan := testToolSpans(h, result, chat)
+	if len(orphan) != 1 || orphan[0].ParentSpanID != "" || orphan[0].StartNs != orphan[0].EndNs {
+		t.Fatalf("oldest call was not evicted: %+v", orphan)
+	}
+	result.RequestBody = []byte(`{"input":[{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`)
+	chat, err = Parse(result, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := testToolSpans(h, result, chat)
+	if len(first) != 1 || first[0].ParentSpanID == "" || first[0].Name != "execute_tool bash" || first[0].StartNs != 2 || first[0].EndNs != 8000 || first[0].Attrs["gen_ai.tool.call.arguments"] != "{}" {
+		t.Fatalf("enriched span=%+v", first)
+	}
+	// Replaying the issuing response must retain its parent, time, and FIFO position.
+	issue := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, EndNs: 9999, ResponseBody: []byte(`{"id":"replayed","output":[{"type":"function_call","call_id":"call_1","name":"changed","arguments":"changed"}]}`)}
+	replayed, err := Parse(issue, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testToolSpans(h, issue, replayed)
+	result.StartNs = 10000
+	chat.StartNs = result.StartNs
+	again := testToolSpans(h, result, chat)
+	if len(again) != 1 || again[0].TraceID != first[0].TraceID || again[0].ParentSpanID != first[0].ParentSpanID || again[0].StartNs != first[0].StartNs || again[0].EndNs != first[0].EndNs || again[0].SpanID != first[0].SpanID || again[0].Name != first[0].Name {
+		t.Fatalf("replay changed first observation: %+v -> %+v", first, again)
+	}
+	// Zero is a valid first result timestamp, not an unset sentinel.
+	zero, _ := New(Config{Logf: t.Logf})
+	issue.EndNs = 0
+	testToolSpans(zero, issue, replayed)
+	result.StartNs, chat.StartNs = 0, 0
+	first = testToolSpans(zero, result, chat)
+	chat.StartNs = 10
+	again = testToolSpans(zero, result, chat)
+	if first[0].EndNs != 0 || again[0].EndNs != 0 {
+		t.Fatal("zero first result time was overwritten")
+	}
+}
+
+func TestToolCacheConcurrent(t *testing.T) {
+	h, err := New(Config{Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			exchange := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, EndNs: 200, ResponseBody: []byte(fmt.Sprintf(`{"id":"reply_%d","output":[{"type":"function_call","call_id":"call_%d","name":"bash","arguments":"{}"}]}`, i, i))}
+			chat, err := Parse(exchange, "")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			testToolSpans(h, exchange, chat)
+			exchange.StartNs, chat.StartNs = 800, 800
+			exchange.RequestBody = []byte(fmt.Sprintf(`{"input":[{"type":"function_call_output","call_id":"call_%d","output":"ok"}]}`, i))
+			first := testToolSpans(h, exchange, chat)
+			exchange.StartNs, chat.StartNs = 1600, 1600
+			again := testToolSpans(h, exchange, chat)
+			if len(first) != 1 || len(again) != 1 || first[0].ParentSpanID != chat.SpanID || first[0].EndNs != 800 || again[0].EndNs != 800 {
+				t.Errorf("first=%+v replay=%+v", first, again)
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
+func TestToolCacheMissIsStateless(t *testing.T) {
+	exchange := Exchange{Vendor: "openai", Path: "/v1/responses", StatusCode: 200, StartNs: 800, RequestBody: []byte(`{"input":[{"type":"function_call_output","call_id":"missing","output":"ok"}]}`)}
+	chat, err := Parse(exchange, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previousTrace, previousID string
+	for i := 0; i < 2; i++ {
+		h, err := New(Config{Logf: t.Logf})
+		if err != nil {
+			t.Fatal(err)
+		}
+		spans := testToolSpans(h, exchange, chat)
+		if len(spans) != 1 || spans[0].Name != "execute_tool" || spans[0].ParentSpanID != "" || spans[0].TraceID == chat.TraceID || spans[0].StartNs != 800 || spans[0].EndNs != 800 {
+			t.Fatalf("orphan=%+v", spans)
+		}
+		if i == 1 && (spans[0].SpanID != previousID || spans[0].TraceID != previousTrace) {
+			t.Fatal("identity changed after cache loss")
+		}
+		previousTrace, previousID = spans[0].TraceID, spans[0].SpanID
+	}
+}
 
 func TestRelayPreservesRequestAndStreamsResponse(t *testing.T) {
 	var gotMethod, gotPath, gotQuery, gotBody, gotKey, gotEncoding, gotConnection, gotHost string

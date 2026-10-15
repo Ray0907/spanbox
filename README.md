@@ -155,6 +155,10 @@ Captured inference routes are POSTs to Anthropic `/v1/messages`, OpenAI `/v1/cha
 
 Pick one capture path per tool. If Gemini CLI telemetry (`~/.gemini/settings.json`) also points at spanbox while `GOOGLE_GEMINI_BASE_URL` goes through the proxy, every model call is recorded twice, once from the log event and once from the proxy. The proxy captures parsed request/response messages, tool names and calls, and cache and thinking token counts—not complete raw request/response bodies—so disable the CLI telemetry when you use it.
 
+### Tool spans
+
+The proxy also records tool use. It reads the tool results a client sends back after the last assistant turn (Anthropic `tool_result`, OpenAI chat `role=tool`, Responses `function_call_output`, Gemini `functionResponse`) and stores one `execute_tool <name>` span per call with its arguments, result and error status. When it saw the model call that requested the tool, the span is that call's child and its duration is the time until the client sent the first result; otherwise it is an orphan with no parent and zero duration, which can also happen after a restart. There is no agent root span, so one prompt's model calls are grouped by session, not by a single trace. See [Capture with the Proxy](docs/proxy.md#tool-spans) for the vendor details and limits. `scripts/proxy-tools-e2e.sh` checks it end to end against a fake vendor.
+
 ## Export traces
 
 ### Python OpenTelemetry

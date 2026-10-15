@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- The capture proxy derives `execute_tool <name>` spans from the tool results clients send back (Anthropic, OpenAI chat and Responses, ChatGPT Codex, Gemini, OpenAI-compatible). Tool name, arguments, result and error status are recorded; when the issuing call was seen, the span is its child and measures the gap to the first result. `scripts/proxy-tools-e2e.sh` covers it end to end. There is no agent root span, so a prompt's model calls are grouped by session. See [Tool spans](docs/proxy.md#tool-spans) for the limits.
 - Read-only `GET /events` SSE stream for live OTLP error, slow-span and trace-cost notifications, with Bearer/cookie authentication, bounded fan-out and 15-second keepalives.
 - `PURGE_BATCH_SIZE` (default 10, 1–200) and `FTS_MERGE_EVERY` (default 256, 1–1024) tune retention. Defaults keep `/search` p95 within 2x baseline and ingest p95 within 3x during a purge (500k spans: search 150ms baseline, 209ms during purge).
 - `scripts/roundtrip-e2e.sh` (export/import round trip across two fresh instances) and `scripts/load-e2e.sh` (retention, concurrent read/ingest and upgrade load check; opt-in, not part of `go test`).
@@ -14,6 +15,7 @@
 - Export filters (range, model, errors) select spans, not whole traces. Import streams with bounded lines and batches instead of a 32 MiB body limit, and pauses retention while it runs.
 
 ### Fixed
+- ChatGPT Codex streams, which deliver output items only in `response.output_item.done` with an empty `response.completed` output, now keep their output messages.
 - Retention no longer deletes traces that still contain unfinished spans or recent arrivals.
 - Invalid UTF-8 survives export/import byte for byte.
 - `/proxy/chatgpt/` accepts only `codex/responses`; a client disconnect mid-stream keeps the partial Responses output.

@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Ray0907/spanbox/internal/otlp"
 )
 
 func fixture(t *testing.T, name string) []byte {
@@ -39,6 +42,187 @@ func parseTools(t *testing.T, value any) struct {
 		t.Fatalf("invalid tool summary: %#v", value)
 	}
 	return got
+}
+
+func toolResultSpans(exchange Exchange, chat otlp.RawSpan) []otlp.RawSpan {
+	var spans []otlp.RawSpan
+	for _, result := range toolResults(exchange, decodeObject(exchange.RequestBody)) {
+		spans = append(spans, toolSpan(exchange.route(), result, chat))
+	}
+	return spans
+}
+
+func TestToolResultSpans(t *testing.T) {
+	tests := []struct {
+		name, vendor, path, body string
+		want                     []string
+	}{
+		{"anthropic parallel and error", "anthropic", "/v1/messages", `{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"bash","input":{"cmd":"ls"}},{"type":"tool_use","id":"b","name":"edit","input":{}}]},{"role":"user","content":[{"type":"text","text":"not a result"},{"type":"tool_result","tool_use_id":"a","content":[{"type":"text","text":"file.txt"}]},{"type":"tool_result","tool_use_id":"b","is_error":true,"content":"boom"}]}]}`, []string{"a", "b"}},
+		{"openai parallel", "openai", "/v1/chat/completions", `{"messages":[{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{\"cmd\":\"ls\"}"}},{"id":"b","function":{"name":"edit","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"file.txt"},{"role":"tool","tool_call_id":"b","content":"ok"}]}`, []string{"a", "b"}},
+		{"responses", "openai", "/v1/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{\"cmd\":\"ls\"}"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`, []string{"a"}},
+		{"chatgpt responses", "chatgpt", "/codex/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`, []string{"a"}},
+		{"old anthropic result", "anthropic", "/v1/messages", `{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"old"}]},{"role":"assistant","content":"done"},{"role":"user","content":"thanks"}]}`, nil},
+		{"old openai result", "openai", "/v1/chat/completions", `{"messages":[{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"bash","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"old"},{"role":"assistant","content":"done"}]}`, nil},
+		{"old responses result", "openai", "/v1/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"old"},{"role":"assistant","content":"done"}]}`, nil},
+		{"responses next call", "openai", "/v1/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"old"},{"type":"function_call","call_id":"b","name":"edit","arguments":"{}"},{"type":"function_call_output","call_id":"b","output":"ok"}]}`, []string{"b"}},
+		{"missing call", "openai", "/v1/chat/completions", `{"messages":[{"role":"tool","tool_call_id":"missing","content":"ok"}]}`, []string{"missing"}},
+		{"missing id", "anthropic", "/v1/messages", `{"messages":[{"role":"assistant","content":[{"type":"tool_use","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","content":"ok"}]}]}`, nil},
+		{"duplicate result", "openai", "/v1/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"file.txt"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`, []string{"a"}},
+		{"gemini skipped", "gemini", "/v1/responses", `{"input":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"},{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`, nil},
+		{"malformed input", "anthropic", "/v1/messages", `{`, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exchange := Exchange{Vendor: tt.vendor, Path: tt.path, RequestBody: []byte(tt.body), StartNs: 100, EndNs: 200, StatusCode: 200}
+			chat, err := Parse(exchange, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			spans := toolResultSpans(exchange, chat)
+			var ids []string
+			for _, span := range spans {
+				id := text(span.Attrs["gen_ai.tool.call.id"])
+				ids = append(ids, id)
+				if span.Name != strings.TrimSpace("execute_tool "+text(span.Attrs["gen_ai.tool.name"])) || span.Attrs["gen_ai.operation.name"] != "execute_tool" {
+					t.Fatalf("name/operation: %+v", span)
+				}
+				if span.SpanID == "" || span.TraceID == "" || span.TraceID == chat.TraceID || span.ParentSpanID != "" || span.StartNs != 100 || span.EndNs != 100 {
+					t.Fatalf("orphan identity/timing: %+v", span)
+				}
+				if _, ok := span.Attrs["gen_ai.tool.call.arguments"]; !ok {
+					t.Fatal("missing arguments")
+				}
+				if _, ok := span.Attrs["gen_ai.tool.call.result"]; !ok {
+					t.Fatal("missing result")
+				}
+				if !reflect.DeepEqual(span.Resource, chat.Resource) || !reflect.DeepEqual(span.Scope, chat.Scope) {
+					t.Fatal("tool span lost resource or scope")
+				}
+				if tt.name == "anthropic parallel and error" {
+					if id == "a" && (!reflect.DeepEqual(span.Attrs["gen_ai.tool.call.arguments"], map[string]any{"cmd": "ls"}) || !strings.Contains(jsonString(span.Attrs["gen_ai.tool.call.result"]), "file.txt")) {
+						t.Fatalf("arguments/result: %+v", span.Attrs)
+					}
+					if id == "b" && span.StatusCode != 2 {
+						t.Fatalf("error status = %d", span.StatusCode)
+					}
+				} else if span.StatusCode != 0 {
+					t.Fatalf("unexpected error status = %d", span.StatusCode)
+				}
+			}
+			if !reflect.DeepEqual(ids, tt.want) {
+				t.Fatalf("call ids = %v, want %v", ids, tt.want)
+			}
+			replayed := toolResultSpans(exchange, chat)
+			for i := range spans {
+				if spans[i].SpanID != replayed[i].SpanID || spans[i].TraceID != replayed[i].TraceID {
+					t.Fatal("replay changed tool span identity")
+				}
+			}
+		})
+	}
+}
+
+func TestGeminiToolResults(t *testing.T) {
+	exchange := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", StatusCode: 200, StartNs: 100, EndNs: 200, RequestBody: []byte(`{"contents":[{"role":"user","parts":[{"text":"run twice"}]},{"role":"model","parts":[{"functionCall":{"name":"bash","args":{"cmd":"one"}}},{"functionCall":{"name":"bash","args":{"cmd":"two"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"bash","response":{"out":"first"}}},{"functionResponse":{"name":"bash","response":{"out":"second"}}}]}]}`)}
+	chat, err := Parse(exchange, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spans := toolResultSpans(exchange, chat)
+	if len(spans) != 2 {
+		t.Fatalf("spans=%+v", spans)
+	}
+	for i, want := range []string{"one", "two"} {
+		if !strings.Contains(jsonString(spans[i].Attrs["gen_ai.tool.call.arguments"]), want) || spans[i].Attrs["gen_ai.tool.call.id"] == "" {
+			t.Fatalf("call %d = %+v", i, spans[i])
+		}
+	}
+	if spans[0].SpanID == spans[1].SpanID {
+		t.Fatal("repeated names collapsed")
+	}
+	replayed := toolResultSpans(exchange, chat)
+	if replayed[0].SpanID != spans[0].SpanID || replayed[1].SpanID != spans[1].SpanID {
+		t.Fatal("unstable Gemini identity")
+	}
+	// The issuing turn is part of identity; old results are skipped.
+	request := decodeObject(exchange.RequestBody)
+	contents := array(request["contents"])
+	contents = append(contents, contents[1], contents[2])
+	exchange.RequestBody = []byte(jsonString(map[string]any{"contents": contents}))
+	next := toolResultSpans(exchange, chat)
+	if len(next) != 2 || next[0].SpanID == spans[0].SpanID || next[1].SpanID == spans[1].SpanID {
+		t.Fatalf("later turn identity = %+v", next)
+	}
+}
+
+func TestGeminiNativeToolResults(t *testing.T) {
+	exchange := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", StatusCode: 200, RequestBody: []byte(`{"contents":[{"role":"user","parts":[{"text":"run twice"}]},{"role":"model","parts":[{"functionCall":{"id":"call-a","name":"bash","args":{"cmd":"one"}}},{"functionCall":{"id":"call-b","name":"bash","args":{"cmd":"two"}}}]},{"role":"user","parts":[{"functionResponse":{"id":"call-b","name":"bash","response":{"out":"second"}}},{"functionResponse":{"id":"call-a","name":"bash","response":{"out":"first"}}}]}]}`)}
+	chat, err := Parse(exchange, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spans := toolResultSpans(exchange, chat)
+	if len(spans) != 2 {
+		t.Fatalf("spans=%+v", spans)
+	}
+	for i, want := range []struct{ id, cmd, out string }{{"call-b", "two", "second"}, {"call-a", "one", "first"}} {
+		attrs := spans[i].Attrs
+		if attrs["gen_ai.tool.call.id"] != want.id || !reflect.DeepEqual(attrs["gen_ai.tool.call.arguments"], map[string]any{"cmd": want.cmd}) || !reflect.DeepEqual(attrs["gen_ai.tool.call.result"], map[string]any{"out": want.out}) {
+			t.Fatalf("reordered call %d: %+v", i, attrs)
+		}
+	}
+	if spans[0].SpanID == spans[1].SpanID {
+		t.Fatal("native ids collapsed")
+	}
+	// Pruning earlier turns must not change a supplied ID or its span identity.
+	request := decodeObject(exchange.RequestBody)
+	request["contents"] = array(request["contents"])[1:]
+	exchange.RequestBody = []byte(jsonString(request))
+	pruned := toolResultSpans(exchange, chat)
+	if len(pruned) != len(spans) {
+		t.Fatalf("pruned spans=%+v", pruned)
+	}
+	for i := range spans {
+		if pruned[i].SpanID != spans[i].SpanID || pruned[i].TraceID != spans[i].TraceID {
+			t.Fatal("native identity changed after pruning history")
+		}
+	}
+}
+
+func TestGeminiToolErrors(t *testing.T) {
+	for _, payload := range []string{`{"error":{"message":"boom"}}`, `{"error":"boom"}`, `{"error":null}`, `{"output":"ok"}`} {
+		exchange := Exchange{Vendor: "gemini", Path: "/v1beta/models/test:generateContent", StatusCode: 200, RequestBody: []byte(`{"contents":[{"role":"model","parts":[{"functionCall":{"name":"bash","args":{}}}]},{"role":"user","parts":[{"functionResponse":{"name":"bash","response":` + payload + `}}]}]}`)}
+		chat, err := Parse(exchange, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		spans := toolResultSpans(exchange, chat)
+		if len(spans) != 1 || !reflect.DeepEqual(spans[0].Attrs["gen_ai.tool.call.result"], decodeObject([]byte(payload))) {
+			t.Fatalf("result lost: %+v", spans)
+		}
+		want := int32(0)
+		if strings.Contains(payload, "error") {
+			want = 2
+		}
+		if spans[0].StatusCode != want {
+			t.Fatalf("payload=%s status=%d want=%d", payload, spans[0].StatusCode, want)
+		}
+	}
+}
+
+func TestProxySessionScope(t *testing.T) {
+	for _, body := range []string{`{"session_id":"native"}`, `{"conversation":"native"}`, `{"conversation":{"id":"native"}}`, `{"metadata":{"session_id":"native"}}`, `{"metadata":{"user_id":"{\"session_id\":\"native\"}"}}`} {
+		for _, header := range []bool{false, true} {
+			exchange := Exchange{Vendor: "anthropic", RequestBody: []byte(body), RequestHeaders: http.Header{}, StatusCode: 200}
+			if header {
+				exchange.RequestHeaders.Set("X-Spanbox-Session", "header")
+			}
+			span, err := Parse(exchange, "test")
+			if err != nil || span.Attrs["gen_ai.conversation.id"] != "native" || header && span.Attrs["spanbox.session"] != "header" {
+				t.Fatalf("body=%s header=%v session=%v err=%v", body, header, span.Attrs["gen_ai.conversation.id"], err)
+			}
+		}
+	}
 }
 
 func TestParseVendorFixtures(t *testing.T) {
@@ -137,6 +321,69 @@ func TestParseVendorFixtures(t *testing.T) {
 				if !strings.Contains(attrs["gen_ai.system_instructions"].(string), "Be concise") || attrs["gen_ai.response.id"] != "resp_test" {
 					t.Fatalf("Responses attrs=%#v", attrs)
 				}
+			}
+		})
+	}
+}
+
+func TestCodexOutputItemDone(t *testing.T) {
+	body := string(fixture(t, "chatgpt_responses_stream.txt"))
+	call := map[string]any{"id": "fc_real", "type": "function_call", "call_id": "call_real", "name": "read", "arguments": `{"path":"a"}`, "status": "completed"}
+	done := "\nevent: response.output_item.done\ndata: " + jsonString(map[string]any{"type": "response.output_item.done", "output_index": 1, "item": call}) + "\n\n"
+	// If completed.output also contains the items, it is authoritative, not duplicated.
+	message := map[string]any{"id": "msg_redacted_2", "type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "final text"}}}
+	at := strings.LastIndex(body, `"output":[]`)
+	if at < 0 {
+		t.Fatal("real fixture has no empty completed.output")
+	}
+	withOutput := body[:at] + `"output":` + jsonString([]any{message, call}) + body[at+len(`"output":[]`):]
+	for _, tt := range []struct {
+		name, body, text string
+		want             int
+	}{
+		{"real fixture", body, "ok", 1},
+		{"appended call and repeated done", body + done + done, "ok", 2},
+		{"completed and done share ids", withOutput + done + done, "final text", 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			exchange := Exchange{Vendor: "chatgpt", Path: "/codex/responses", RequestBody: fixture(t, "chatgpt_request.json"), ResponseBody: []byte(tt.body), StatusCode: 200, EndNs: 200}
+			raw, err := Parse(exchange, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var messages []any
+			if err := json.Unmarshal([]byte(text(raw.Attrs["gen_ai.output.messages"])), &messages); err != nil || len(messages) != tt.want {
+				t.Fatalf("messages=%v want=%d err=%v", messages, tt.want, err)
+			}
+			seen := map[string]bool{}
+			for _, value := range messages {
+				id := text(objectOf(value)["id"])
+				if id == "" || seen[id] {
+					t.Fatalf("missing or duplicate item id: %v", messages)
+				}
+				seen[id] = true
+			}
+			if !strings.Contains(text(raw.Attrs["gen_ai.output.messages"]), tt.text) || raw.Attrs["gen_ai.response.id"] != "resp_redacted_1" {
+				t.Fatalf("output or response identity lost: %v", raw.Attrs)
+			}
+			attrInt(t, raw.Attrs, "gen_ai.usage.input_tokens", 374)
+			attrInt(t, raw.Attrs, "gen_ai.usage.output_tokens", 5)
+			if tt.want == 1 {
+				return
+			}
+			h, err := New(Config{Logf: t.Logf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			testToolSpans(h, exchange, raw)
+			result := Exchange{Vendor: "chatgpt", Path: "/codex/responses", StatusCode: 200, StartNs: 800, RequestBody: []byte(`{"input":[{"type":"function_call_output","call_id":"call_real","output":"contents of a"}]}`)}
+			chat, err := Parse(result, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			spans := testToolSpans(h, result, chat)
+			if len(spans) != 1 || spans[0].ParentSpanID != raw.SpanID || spans[0].TraceID != raw.TraceID || spans[0].StartNs != 200 || spans[0].EndNs != 800 || spans[0].Name != "execute_tool read" || spans[0].Attrs["gen_ai.tool.call.arguments"] != `{"path":"a"}` {
+				t.Fatalf("Codex call was not registered: %+v", spans)
 			}
 		})
 	}
