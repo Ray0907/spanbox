@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-10-17
 
 ### Added
 - Session-aware proxy capture now creates one trace per user turn with an `invoke_agent <service.name>` root. Models are root children; tools keep their issuing model parent. Deterministic IDs and SQLite turn state survive restarts and incremental continuations (schema v4). Roots track timing, prompt, latest output and sticky errors without duplicating tokens or cost. Turn state follows retention; no-session capture and existing traces are unchanged.
