@@ -93,7 +93,7 @@ func (deps Deps) importSpans(w http.ResponseWriter, r *http.Request) {
 		if len(batch) == 0 {
 			return nil
 		}
-		if err := (pipeline.Pipeline{Store: deps.Store, Pricing: deps.Pricing, Publish: deps.publishIngestEvents}).Commit(r.Context(), pipeline.Import, batch); err != nil {
+		if err := (pipeline.Pipeline{Store: deps.Store, Pricing: deps.Pricing}).Commit(r.Context(), pipeline.Import, batch); err != nil {
 			return err
 		}
 		count += len(batch)
