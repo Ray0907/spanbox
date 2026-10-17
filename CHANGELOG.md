@@ -10,13 +10,19 @@
 - `PURGE_BATCH_SIZE` (default 10, 1–200) and `FTS_MERGE_EVERY` (default 256, 1–1024) tune retention. Defaults keep `/search` p95 within 2x baseline and ingest p95 within 3x during a purge (500k spans: search 150ms baseline, 209ms during purge).
 - `scripts/roundtrip-e2e.sh` (export/import round trip across two fresh instances) and `scripts/load-e2e.sh` (retention, concurrent read/ingest and upgrade load check; opt-in, not part of `go test`).
 - End-to-end test for the ChatGPT-authenticated Codex proxy.
+- `GET /search?format=json` accepts `sort=recent|relevance` (default `recent`). `relevance` ranks all matches with FTS5 bm25 and returns the top `limit` hits; it has no cursor, and a cursor or unknown `sort` value returns HTTP 400.
 
 ### Changed
+- The web UI feels native on mobile: hover styles apply only to fine pointers, inputs are 16px on coarse pointers, safe-area and per-scheme `theme-color` are set, and `dvh`/`svh` replace `vh`.
+- `X-Spanbox-Session` is now the span `session_id`, so the session filter and Sessions page find tagged proxy traces. It takes precedence over `gen_ai.conversation.id`, which stays stored as an attribute; trace identity is unchanged.
+- OTLP ingest, proxy capture and NDJSON import share one commit path for pricing, insert and `/events`. Only OTLP publishes to `/events`; an import without a cost is priced like OTLP, and one that already has a cost keeps it.
 - `/search` selects a page of matches from an index before reading span bodies, and the dashboard reads a covering index. Schema v1→v2 builds these at startup: a 500k-span upgrade took 1.384s with 41.98 MiB peak WAL and 73.71 MiB peak additional DB/WAL/SHM space. Keep at least 512 MiB extra data/temp filesystem headroom for a comparable DB, beyond backups; see README.
 - Retention deletes in small turns with yields, compacts the FTS index and WAL cooperatively and reclaims pages. At 500k spans a purge takes about 68s and the DB shrinks from 1212 to 608 MiB. Legacy non-incremental `auto_vacuum` DBs warn once instead of failing cleanup; a purge skipped because an import is running retries after one minute.
 - Export filters (range, model, errors) select spans, not whole traces. Import streams with bounded lines and batches instead of a 32 MiB body limit, and pauses retention while it runs.
 
 ### Fixed
+- Cache-creation tokens are priced on every ingest path. The same Anthropic usage previously cost 0.056199 through OTLP and 0.070145 through the proxy; both now store 0.070145.
+- The capture proxy drops a capture, and logs `proxy captures dropped`, when all capture slots are busy instead of holding the client open until one frees. Tool origins are still recorded for a dropped capture, so later tool results keep their trace and parent links.
 - ChatGPT Codex streams, which deliver output items only in `response.output_item.done` with an empty `response.completed` output, now keep their output messages.
 - Retention no longer deletes traces that still contain unfinished spans or recent arrivals.
 - Invalid UTF-8 survives export/import byte for byte.
