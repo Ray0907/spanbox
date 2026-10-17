@@ -72,19 +72,20 @@ type toolOrigin struct {
 }
 
 type Handler struct {
-	endpoints    map[string]endpoint
-	logf         func(string, ...any)
-	idleTimeout  time.Duration
-	nonInference atomic.Uint64
-	store        *store.Store
-	pricing      *pricing.Table
-	version      string
-	wg           sync.WaitGroup
-	captureSlots chan struct{}
-	toolMu       sync.Mutex
-	toolCalls    map[string]toolOrigin
-	toolOrder    []string
-	nextTool     int
+	endpoints       map[string]endpoint
+	logf            func(string, ...any)
+	idleTimeout     time.Duration
+	nonInference    atomic.Uint64
+	droppedCaptures atomic.Uint64
+	store           *store.Store
+	pricing         *pricing.Table
+	version         string
+	wg              sync.WaitGroup
+	captureSlots    chan struct{}
+	toolMu          sync.Mutex
+	toolCalls       map[string]toolOrigin
+	toolOrder       []string
+	nextTool        int
 }
 
 func New(cfg Config) (*Handler, error) {
@@ -346,7 +347,12 @@ func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start t
 }
 
 func (h *Handler) captureAsync(exchange Exchange) {
-	h.captureSlots <- struct{}{}
+	select {
+	case h.captureSlots <- struct{}{}:
+	default:
+		h.logf("metric: proxy captures dropped=%d", h.droppedCaptures.Add(1))
+		return
+	}
 	h.wg.Add(1)
 	go func() {
 		defer func() {

@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -899,6 +901,147 @@ func TestCredentialsAreRelayedButNeverCaptured(t *testing.T) {
 	mu.Unlock()
 	if strings.Contains(attributes+resource+events+capturedLogs, secret) {
 		t.Fatal("credential was captured")
+	}
+}
+
+func TestClientResponseCompletesWhenCaptureSlotsAreFull(t *testing.T) {
+	const body = `{"id":"response_1","output":[]}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var mu sync.Mutex
+	var logs []string
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, Store: database, Logf: func(format string, args ...any) {
+		mu.Lock()
+		logs = append(logs, fmt.Sprintf(format, args...))
+		mu.Unlock()
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range cap(handler.captureSlots) {
+		handler.captureSlots <- struct{}{}
+	}
+	releaseSlots := func() {
+		for range cap(handler.captureSlots) {
+			select {
+			case <-handler.captureSlots:
+			default:
+			}
+		}
+	}
+	proxy := httptest.NewServer(handler)
+	defer func() {
+		releaseSlots()
+		proxy.Close()
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, proxy.URL+"/proxy/openai/v1/responses", strings.NewReader(`{"model":"test"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	response, err := proxy.Client().Do(req)
+	elapsed := time.Since(started)
+	if err != nil {
+		t.Fatalf("client still waiting after %s: %v", elapsed, err)
+	}
+	defer response.Body.Close()
+	got, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("client still waiting after %s: %v", time.Since(started), err)
+	}
+	if response.StatusCode != http.StatusOK || string(got) != body || elapsed > 500*time.Millisecond {
+		t.Fatalf("status=%d elapsed=%s body=%q", response.StatusCode, elapsed, got)
+	}
+	handler.Wait()
+	var count int
+	if err := database.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if count != 0 || !strings.Contains(strings.Join(logs, "\n"), "proxy captures dropped=1") {
+		t.Fatalf("spans=%d logs=%q", count, logs)
+	}
+}
+
+func TestWaitDrainsInFlightCapture(t *testing.T) {
+	dir := t.TempDir() + "/data"
+	database, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	lock, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(dir, "spanbox.db"))+"?_pragma=busy_timeout(1000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if _, err := lock.Exec("BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := New(Config{Store: database, Version: "test", Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.captureAsync(Exchange{
+		Vendor: "anthropic", Path: "/v1/messages", StatusCode: http.StatusOK,
+		RequestHeaders: make(http.Header), RequestBody: fixture(t, "anthropic_request.json"),
+		ResponseBody: fixture(t, "anthropic_stream.txt"), StartNs: 1, EndNs: 2,
+	})
+	drained := make(chan struct{})
+	go func() {
+		handler.Wait()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+		t.Fatal("Wait returned while the capture insert was blocked")
+	case <-time.After(150 * time.Millisecond):
+	}
+	if _, err := lock.Exec("ROLLBACK"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-drained:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Wait did not return after the capture could finish")
+	}
+	var count int
+	if err := database.Reader().QueryRow("SELECT count(*) FROM spans").Scan(&count); err != nil || count == 0 {
+		t.Fatalf("in-flight capture not stored: count=%d err=%v", count, err)
+	}
+}
+
+func TestUpstreamIdleTimeoutAfterHeaders(t *testing.T) {
+	const partial = "partial-body"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(partial))
+		w.(http.Flusher).Flush()
+		time.Sleep(400 * time.Millisecond)
+	}))
+	defer upstream.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, IdleTimeout: 30 * time.Millisecond, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/proxy/openai/v1/responses", strings.NewReader(`{"model":"test"}`)))
+	elapsed := time.Since(started)
+	if response.Code != http.StatusOK || response.Body.String() != partial || strings.Contains(response.Body.String(), "upstream idle timeout") || elapsed >= 300*time.Millisecond {
+		t.Fatalf("status=%d elapsed=%s body=%q", response.Code, elapsed, response.Body.String())
 	}
 }
 
