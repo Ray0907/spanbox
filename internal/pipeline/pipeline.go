@@ -27,6 +27,7 @@ type Pipeline struct {
 	Pricing    *pricing.Table
 	Publish    Publisher
 	ProxyCalls []store.ProxyToolCall
+	ProxyTurn  *store.ProxyTurn
 }
 
 func (p Pipeline) Commit(ctx context.Context, source Source, spans []store.Span) error {
@@ -53,7 +54,7 @@ func (p Pipeline) Commit(ctx context.Context, source Source, spans []store.Span)
 		}
 	}
 	if source == Proxy {
-		return p.Store.InsertProxyBatch(ctx, spans, p.ProxyCalls)
+		return p.Store.InsertProxyTurnBatch(ctx, spans, p.ProxyCalls, p.ProxyTurn)
 	}
 	costs, err := p.Store.InsertBatch(ctx, spans)
 	if err != nil {

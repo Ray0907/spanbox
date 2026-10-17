@@ -26,7 +26,11 @@ func (s *Store) GetProxyToolCall(ctx context.Context, key string) (ProxyToolCall
 
 // InsertProxyBatch commits correlation and spans together, including the first result timestamp.
 func (s *Store) InsertProxyBatch(ctx context.Context, spans []Span, calls []ProxyToolCall) error {
-	if len(calls) == 0 {
+	return s.insertProxyBatch(ctx, spans, calls, nil)
+}
+
+func (s *Store) insertProxyBatch(ctx context.Context, spans []Span, calls []ProxyToolCall, turn *ProxyTurn) error {
+	if len(calls) == 0 && turn == nil {
 		_, err := s.InsertBatch(ctx, spans)
 		return err
 	}
@@ -40,6 +44,13 @@ func (s *Store) InsertProxyBatch(ctx context.Context, spans []Span, calls []Prox
 		return err
 	}
 	defer tx.Rollback()
+	if turn != nil {
+		root, err := upsertProxyTurn(ctx, tx, *turn)
+		if err != nil {
+			return err
+		}
+		spans = append(spans, root)
+	}
 	if _, err := insertBatch(ctx, tx, spans); err != nil {
 		return err
 	}

@@ -1,6 +1,6 @@
 # Data Model
 
-spanbox keeps two tables and one full-text index in `spanbox.db`. Query them with the [SQL console](sql-console.md).
+spanbox keeps span/trace tables, proxy correlation/turn tables, and one full-text index in `spanbox.db` (schema v4). Query them with the [SQL console](sql-console.md).
 
 ## `spans`
 
@@ -33,7 +33,7 @@ Indexes cover start time, kind plus day, model, session, and user.
 
 ## `traces`
 
-One row per trace, aggregated from its spans.
+One row per trace, aggregated from its spans. Session-aware proxy capture uses one trace per user turn, rooted at an `invoke_agent` agent span, with model children and tools beneath their issuing model. Root spans carry no tokens or cost; totals sum only `llm`/`embedding` spans. Sessions group multiple turns. Capture without a session has no agent root, and existing session-level traces are not rewritten.
 
 | Column | Notes |
 |---|---|
@@ -45,6 +45,14 @@ One row per trace, aggregated from its spans.
 | `has_error` | 0 or 1 |
 | `session_id`, `user_id` | |
 | `models` | Models used |
+
+## `proxy_tool_calls`
+
+Internal proxy correlation (schema v3). `key` identifies the route/session/call; `trace_id`, `span_id`, `end_ns`, `first_result_ns`, `has_result`, `name` and JSON `arguments` preserve the issuing model and first-result timing. `created_ns` controls retention.
+
+## `proxy_turns`
+
+Internal proxy turn state (schema v4). `key` encodes route, scoped session, anchor index and anchor JSON hash. `route` and `scope_session` identify the scope; indexed `start_ns` selects its latest turn when a continuation omits the anchor. `end_ns` and JSON `root` persist the merged root span (including deterministic IDs, input/output and error status). `created_ns` controls retention. Root/turn updates, model/tool spans and tool correlation share a transaction. Sweeps expire these records alongside correlation records; `RETENTION_DAYS=0` disables sweeping.
 
 ## `spans_fts`
 

@@ -384,12 +384,22 @@ func (h *Handler) recordDroppedOrigins(exchange Exchange) {
 	}
 	h.toolMu.Lock()
 	defer h.toolMu.Unlock()
+	if h.store != nil {
+		turn, err := h.proxyTurn(exchange, chat, request, response)
+		if err != nil {
+			h.logf("lookup dropped proxy turn: %v", err)
+			return
+		}
+		if turn != nil {
+			chat.TraceID = turn.Root.TraceID
+		}
+	}
 	_, origins, err := h.toolSpansLocked(exchange, chat, request, response, nil)
 	if err != nil {
 		h.logf("lookup dropped proxy tool call: %v", err)
 		return
 	}
-	if err := h.commitProxy(nil, origins); err != nil {
+	if err := h.commitProxy(nil, origins, nil); err != nil {
 		h.logf("insert dropped proxy tool call: %v", err)
 	}
 }
@@ -414,6 +424,15 @@ func (h *Handler) capture(exchange Exchange) {
 	// Serialize correlation through commit so concurrent results share the first timestamp.
 	h.toolMu.Lock()
 	defer h.toolMu.Unlock()
+	turn, err := h.proxyTurn(exchange, raw, request, response)
+	if err != nil {
+		h.logf("lookup proxy turn: %v", err)
+		return
+	}
+	if turn != nil {
+		raw.TraceID, raw.ParentSpanID = turn.Root.TraceID, turn.Root.SpanID
+		span.TraceID, span.ParentSpanID = raw.TraceID, raw.ParentSpanID
+	}
 	rawTools, origins, err := h.toolSpansLocked(exchange, raw, request, response, toolResults(exchange, request))
 	if err != nil {
 		h.logf("lookup proxy tool call: %v", err)
@@ -428,13 +447,13 @@ func (h *Handler) capture(exchange Exchange) {
 		}
 		spans = append(spans, tool)
 	}
-	if err := h.commitProxy(spans, origins); err != nil {
+	if err := h.commitProxy(spans, origins, turn); err != nil {
 		h.logf("insert proxy span: %v", err)
 	}
 }
 
 // The caller holds toolMu; publish cache entries only after their transaction commits.
-func (h *Handler) commitProxy(spans []store.Span, origins map[string]toolOrigin) error {
+func (h *Handler) commitProxy(spans []store.Span, origins map[string]toolOrigin, turn *store.ProxyTurn) error {
 	if h.store != nil {
 		calls := make([]store.ProxyToolCall, 0, len(origins))
 		for key, origin := range origins {
@@ -442,7 +461,7 @@ func (h *Handler) commitProxy(spans []store.Span, origins map[string]toolOrigin)
 				EndNs: origin.endNs, FirstResultNs: origin.firstResultNs, HasResult: origin.hasResult,
 				Name: origin.name, Arguments: jsonString(origin.arguments), CreatedNs: origin.createdNs})
 		}
-		if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing, ProxyCalls: calls}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
+		if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing, ProxyCalls: calls, ProxyTurn: turn}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
 			return err
 		}
 	}

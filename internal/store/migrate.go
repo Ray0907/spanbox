@@ -116,6 +116,18 @@ CREATE TABLE IF NOT EXISTS proxy_tool_calls (
   created_ns      INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS proxy_tool_calls_created ON proxy_tool_calls(created_ns);
+`, `
+CREATE TABLE IF NOT EXISTS proxy_turns (
+  key           TEXT PRIMARY KEY,
+  route         TEXT NOT NULL,
+  scope_session TEXT NOT NULL,
+  start_ns      INTEGER NOT NULL,
+  end_ns        INTEGER NOT NULL,
+  root          TEXT NOT NULL,
+  created_ns    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS proxy_turns_session ON proxy_turns(route, scope_session, start_ns DESC, key DESC);
+CREATE INDEX IF NOT EXISTS proxy_turns_created ON proxy_turns(created_ns);
 `}
 
 func Open(dataDir string) (*Store, error) {

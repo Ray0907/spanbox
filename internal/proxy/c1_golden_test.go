@@ -113,7 +113,7 @@ func TestC1Golden(t *testing.T) {
 			var snapshots [][]byte
 			for _, e := range c.Exchanges {
 				h.capture(e)
-				snapshots = append(snapshots, c1Dump(t, db))
+				snapshots = append(snapshots, c2LegacyProjection(t, c1Dump(t, db)))
 			}
 			dump := bytes.Join(snapshots, []byte("\n"))
 			sum := fmt.Sprintf("%x", sha256.Sum256(dump))

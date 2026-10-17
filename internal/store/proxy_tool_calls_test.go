@@ -28,7 +28,7 @@ func TestProxyToolCallsMigration(t *testing.T) {
 	}
 	defer db.Close()
 	var version, count int
-	if err := db.r.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
+	if err := db.r.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 4 {
 		t.Fatalf("schema=%d err=%v", version, err)
 	}
 	if err := db.r.QueryRow("SELECT count(*) FROM traces").Scan(&count); err != nil || count != 1 {

@@ -290,6 +290,9 @@ func TestCodexProxyE2E(t *testing.T) {
 		deadline := time.Now().Add(30 * time.Second)
 		for {
 			for _, span := range readSpans(t) {
+				if span.Kind != "llm" {
+					continue
+				}
 				var attrs map[string]any
 				if err := json.Unmarshal([]byte(span.Attributes), &attrs); err != nil {
 					t.Fatal(err)
@@ -472,7 +475,21 @@ func TestCodexProxyE2E(t *testing.T) {
 		t.Errorf("rejected request reached upstream: %s?%s", got.path, got.query)
 	default:
 	}
-	if spans := readSpans(t); len(spans) != 7 {
-		t.Errorf("span count=%d, want exactly 7 accepted requests", len(spans))
+	models, roots := 0, 0
+	for _, span := range readSpans(t) {
+		switch span.Kind {
+		case "llm":
+			models++
+		case "agent":
+			roots++
+		default:
+			t.Errorf("unexpected span kind=%q", span.Kind)
+		}
+	}
+	if models != 7 {
+		t.Errorf("model span count=%d, want exactly 7 accepted requests", models)
+	}
+	if roots != 7 {
+		t.Errorf("agent root count=%d, want exactly 7 accepted requests", roots)
 	}
 }
