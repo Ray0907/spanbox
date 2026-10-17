@@ -386,11 +386,7 @@ func (h *Handler) capture(exchange Exchange) {
 		return
 	}
 	if h.pricing != nil && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
-		var cacheCreation *int64
-		if value, ok := raw.Attrs["gen_ai.usage.cache_creation.input_tokens"].(int64); ok {
-			cacheCreation = &value
-		}
-		if cost, ok := h.pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, cacheCreation); ok {
+		if cost, ok := h.pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, span.CacheCreationTokens); ok {
 			span.CostUSD, span.CostSource = &cost, "pricing"
 		}
 	}
