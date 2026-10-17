@@ -20,7 +20,7 @@ func TestExportImportInvalidUTF8(t *testing.T) {
 			fields.Field(i).SetString("世界\x00\xff\xfe" + name)
 		}
 	}
-	if err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	exported := exportRequest(h, "GET", "/export", "", nil)

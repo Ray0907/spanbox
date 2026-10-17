@@ -40,7 +40,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	input := int64(0)
 	cost := 0.0
 	span.InputTokens, span.CostUSD = &input, &cost
-	if err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	from, to := now.Format(time.RFC3339), now.Add(time.Second).Format(time.RFC3339)

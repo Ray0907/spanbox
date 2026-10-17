@@ -17,7 +17,7 @@ func TestExportSpansOrderAndBounds(t *testing.T) {
 	}
 	spans[1].InputContent = `{"messages":["keep me"]}`
 	spans[1].InputTokens, spans[1].CostUSD = i64(0), f64(0)
-	if err := s.InsertBatch(ctx, spans); err != nil {
+	if _, err := s.InsertBatch(ctx, spans); err != nil {
 		t.Fatal(err)
 	}
 	var got []Span
@@ -55,7 +55,7 @@ func TestExportSpansMatchesSpanFiltersWithoutPageLimit(t *testing.T) {
 	also := first
 	also.TraceID, also.SpanID = traceID(3), spanID(4)
 	also.StartNs, also.EndNs, also.DurationMs = 1_100_000_000, 2_200_000_000, 1100
-	if err := s.InsertBatch(ctx, []Span{first, child, other, also}); err != nil {
+	if _, err := s.InsertBatch(ctx, []Span{first, child, other, also}); err != nil {
 		t.Fatal(err)
 	}
 	base := TraceFilter{FromNs: 1_000_000_000, ToNs: 2_000_000_000, Model: "gpt-4o", Service: "api", ErrorsOnly: true, MinDurationMs: 800, SessionID: "session-a", UserID: "user-a", Limit: 1, CursorStartNs: 1, CursorTraceID: first.TraceID}

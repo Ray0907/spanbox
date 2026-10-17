@@ -18,7 +18,7 @@ func TestRetentionRetriesAfterImport(t *testing.T) {
 	old := time.Now().Add(-70 * 24 * time.Hour).UnixNano()
 	span := store.Span{TraceID: "11111111111111111111111111111111", SpanID: "2222222222222222",
 		Name: "old", Kind: "other", StartNs: old, EndNs: old + 1000000, DurationMs: 1}
-	if err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []store.Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	release := db.PauseRetention()

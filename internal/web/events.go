@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -84,7 +83,7 @@ func (b *eventBroadcaster) publish(kind string, data eventData) {
 	}
 }
 
-func (deps Deps) publishIngestEvents(ctx context.Context, spans []store.Span) {
+func (deps Deps) publishIngestEvents(spans []store.Span, costs map[string]sql.NullFloat64) {
 	active, wantCost := deps.events.interest()
 	if !active {
 		return
@@ -100,14 +99,11 @@ func (deps Deps) publishIngestEvents(ctx context.Context, spans []store.Span) {
 		}
 	}
 	for traceID, spanID := range traces {
-		var cost sql.NullFloat64
-		if err := deps.Store.Reader().QueryRowContext(ctx, "SELECT cost_usd FROM traces WHERE trace_id=?", traceID).Scan(&cost); err != nil {
-			deps.Logf("events trace cost: %v", err)
+		cost, ok := costs[traceID]
+		if !ok || !cost.Valid {
 			continue
 		}
-		if cost.Valid {
-			deps.events.publish("cost", eventData{TraceID: traceID, SpanID: spanID, CostUSD: cost.Float64})
-		}
+		deps.events.publish("cost", eventData{TraceID: traceID, SpanID: spanID, CostUSD: cost.Float64})
 	}
 }
 

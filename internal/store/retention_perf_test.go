@@ -30,7 +30,7 @@ func TestDashboardPercentileDaysMatchTraceDaysAtMidnight(t *testing.T) {
 		spans[i].Kind, spans[i].RequestModel = "llm", "model"
 		spans[i].DurationMs = float64(i + 1)
 	}
-	if err := db.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := db.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	data, err := db.Dashboard(context.Background(), midnight-int64(24*time.Hour), midnight+int64(24*time.Hour))
@@ -58,7 +58,7 @@ func TestLoadQueryMigrationAndSearchPage(t *testing.T) {
 		span.Kind, span.RequestModel = "llm", "model"
 		spans = append(spans, span)
 	}
-	if err := db.InsertBatch(ctx, spans); err != nil {
+	if _, err := db.InsertBatch(ctx, spans); err != nil {
 		t.Fatal(err)
 	}
 	// Reopen an existing version-1 DB, not just the fresh-schema path.
@@ -104,7 +104,7 @@ func TestPurgeKeepsWholeRecentOrIncompleteTraces(t *testing.T) {
 		tid := traceID(byte(i + 2))
 		spans = append(spans, testSpan(tid, spanID(1), 1, 2), testSpan(tid, spanID(2), times[0], times[1]))
 	}
-	if err := db.InsertBatch(ctx, spans); err != nil {
+	if _, err := db.InsertBatch(ctx, spans); err != nil {
 		t.Fatal(err)
 	}
 	deleted, err := db.Purge(ctx, 100)
@@ -124,7 +124,7 @@ func TestPurgeRestoresCheckpointPolicyAfterCancellation(t *testing.T) {
 	if _, err := db.w.Exec("PRAGMA wal_autocheckpoint=17"); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.InsertBatch(context.Background(), []Span{testSpan(traceID(1), spanID(1), 1, 2)}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []Span{testSpan(traceID(1), spanID(1), 1, 2)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Purge(context.Background(), 0); err != nil {
@@ -188,7 +188,7 @@ func TestPurgeDoesNotLoopOnLegacyNonIncrementalDatabase(t *testing.T) {
 	}
 	span := testSpan(traceID(1), spanID(1), 1, 2)
 	span.InputContent = strings.Repeat("body ", 2000)
-	if err := db.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	var logs bytes.Buffer
@@ -198,7 +198,7 @@ func TestPurgeDoesNotLoopOnLegacyNonIncrementalDatabase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	for i := 0; i < 2; i++ {
-		if err := db.InsertBatch(ctx, []Span{span}); err != nil {
+		if _, err := db.InsertBatch(ctx, []Span{span}); err != nil {
 			t.Fatal(err)
 		}
 		deleted, err := db.Purge(ctx, 100)
@@ -228,7 +228,7 @@ func TestPurgeShrinksMainFileWithoutExternalCheckpoint(t *testing.T) {
 		spans[i] = testSpan(fmt.Sprintf("%032x", i+1), spanID(1), 1, 2)
 		spans[i].InputContent = strings.Repeat("old searchable body ", 200)
 	}
-	if err := db.InsertBatch(ctx, spans); err != nil {
+	if _, err := db.InsertBatch(ctx, spans); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.w.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/Ray0907/spanbox/internal/normalize"
 	"github.com/Ray0907/spanbox/internal/otlp"
+	"github.com/Ray0907/spanbox/internal/pipeline"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 	"github.com/klauspost/compress/zstd"
@@ -72,19 +73,20 @@ type toolOrigin struct {
 }
 
 type Handler struct {
-	endpoints    map[string]endpoint
-	logf         func(string, ...any)
-	idleTimeout  time.Duration
-	nonInference atomic.Uint64
-	store        *store.Store
-	pricing      *pricing.Table
-	version      string
-	wg           sync.WaitGroup
-	captureSlots chan struct{}
-	toolMu       sync.Mutex
-	toolCalls    map[string]toolOrigin
-	toolOrder    []string
-	nextTool     int
+	endpoints       map[string]endpoint
+	logf            func(string, ...any)
+	idleTimeout     time.Duration
+	nonInference    atomic.Uint64
+	droppedCaptures atomic.Uint64
+	store           *store.Store
+	pricing         *pricing.Table
+	version         string
+	wg              sync.WaitGroup
+	captureSlots    chan struct{}
+	toolMu          sync.Mutex
+	toolCalls       map[string]toolOrigin
+	toolOrder       []string
+	nextTool        int
 }
 
 func New(cfg Config) (*Handler, error) {
@@ -346,7 +348,13 @@ func (h *Handler) stream(w http.ResponseWriter, response *http.Response, start t
 }
 
 func (h *Handler) captureAsync(exchange Exchange) {
-	h.captureSlots <- struct{}{}
+	select {
+	case h.captureSlots <- struct{}{}:
+	default:
+		h.logf("metric: proxy captures dropped=%d", h.droppedCaptures.Add(1))
+		h.recordDroppedOrigins(exchange)
+		return
+	}
 	h.wg.Add(1)
 	go func() {
 		defer func() {
@@ -361,6 +369,20 @@ func (h *Handler) captureAsync(exchange Exchange) {
 }
 
 func (h *Handler) Wait() { h.wg.Wait() }
+
+// DroppedCaptures counts inference exchanges skipped because every capture slot was busy.
+func (h *Handler) DroppedCaptures() uint64 { return h.droppedCaptures.Load() }
+
+// recordDroppedOrigins keeps tool-call origins for an exchange whose span is not stored,
+// so a later tool result still links to the call that issued it.
+func (h *Handler) recordDroppedOrigins(exchange Exchange) {
+	request, response := decodeExchange(exchange)
+	chat, err := parseExchange(exchange, h.version, request, response)
+	if err != nil && chat.TraceID == "" {
+		return
+	}
+	h.recordToolCalls(exchange, chat, request, response)
+}
 
 func (h *Handler) capture(exchange Exchange) {
 	if h.store == nil {
@@ -379,15 +401,6 @@ func (h *Handler) capture(exchange Exchange) {
 		h.logf("normalize proxy span: %v", err)
 		return
 	}
-	if h.pricing != nil && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
-		var cacheCreation *int64
-		if value, ok := raw.Attrs["gen_ai.usage.cache_creation.input_tokens"].(int64); ok {
-			cacheCreation = &value
-		}
-		if cost, ok := h.pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, cacheCreation); ok {
-			span.CostUSD, span.CostSource = &cost, "pricing"
-		}
-	}
 	spans := []store.Span{span}
 	for _, rawTool := range h.toolSpans(exchange, raw, request, response) {
 		tool, err := normalize.Span(rawTool, h.logf)
@@ -397,14 +410,19 @@ func (h *Handler) capture(exchange Exchange) {
 		}
 		spans = append(spans, tool)
 	}
-	if err := h.store.InsertBatch(context.Background(), spans); err != nil {
+	if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
 		h.logf("insert proxy span: %v", err)
 	}
 }
 
 func (h *Handler) toolSpans(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse) []otlp.RawSpan {
+	spans := h.resultSpans(exchange, chat, request)
+	h.recordToolCalls(exchange, chat, request, response)
+	return spans
+}
+
+func (h *Handler) resultSpans(exchange Exchange, chat otlp.RawSpan, request map[string]any) []otlp.RawSpan {
 	results := toolResults(exchange, request)
-	calls := toolCalls(array(response.outputMessages), len(array(request["contents"])))
 	h.toolMu.Lock()
 	defer h.toolMu.Unlock()
 	var spans []otlp.RawSpan
@@ -430,6 +448,13 @@ func (h *Handler) toolSpans(exchange Exchange, chat otlp.RawSpan, request map[st
 		}
 		spans = append(spans, span)
 	}
+	return spans
+}
+
+func (h *Handler) recordToolCalls(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse) {
+	calls := toolCalls(array(response.outputMessages), len(array(request["contents"])))
+	h.toolMu.Lock()
+	defer h.toolMu.Unlock()
 	for id, call := range calls {
 		key := toolKey(exchange.route(), chat, id)
 		if _, ok := h.toolCalls[key]; ok {
@@ -447,7 +472,6 @@ func (h *Handler) toolSpans(exchange Exchange, chat otlp.RawSpan, request map[st
 		}
 		h.toolCalls[key] = toolOrigin{toolCall: call, traceID: chat.TraceID, spanID: chat.SpanID, endNs: chat.EndNs}
 	}
-	return spans
 }
 
 func captureHeaders(headers http.Header) http.Header {

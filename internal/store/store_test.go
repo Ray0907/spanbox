@@ -110,7 +110,7 @@ func TestInsertBatchRecompute(t *testing.T) {
 	llm.InputTokens, llm.OutputTokens, llm.CostUSD = i64(100), i64(20), f64(0.001)
 	tool := testSpan(trace, spanID(3), 250_000_000, 300_000_000)
 	tool.Kind, tool.ParentSpanID = "tool", llm.SpanID
-	if err := store.InsertBatch(context.Background(), []Span{tool, llm, root}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{tool, llm, root}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,7 +133,7 @@ func TestInsertBatchRejectsInvalidCosts(t *testing.T) {
 		store := openTestStore(t)
 		span := testSpan(traceID(1), spanID(1), 1, 2)
 		span.CostUSD = f64(math.Inf(1))
-		if err := store.InsertBatch(context.Background(), []Span{span}); !errors.Is(err, ErrCostOutOfRange) {
+		if _, err := store.InsertBatch(context.Background(), []Span{span}); !errors.Is(err, ErrCostOutOfRange) {
 			t.Fatalf("got %v, want ErrCostOutOfRange", err)
 		}
 	})
@@ -146,7 +146,7 @@ func TestInsertBatchRejectsInvalidCosts(t *testing.T) {
 			span.Kind = "llm"
 			span.InputTokens, span.OutputTokens, span.CostUSD = i64(1), i64(1), f64(600_000)
 		}
-		if err := store.InsertBatch(context.Background(), []Span{one, two}); !errors.Is(err, ErrCostOutOfRange) {
+		if _, err := store.InsertBatch(context.Background(), []Span{one, two}); !errors.Is(err, ErrCostOutOfRange) {
 			t.Fatalf("got %v, want ErrCostOutOfRange", err)
 		}
 		var count int
@@ -165,7 +165,7 @@ func TestNullPropagation(t *testing.T) {
 	two.Kind, two.InputTokens, two.OutputTokens = "llm", i64(20), i64(3)
 	embedding := testSpan(trace, spanID(3), 3, 4)
 	embedding.Kind, embedding.OutputTokens, embedding.CostUSD = "embedding", i64(0), f64(0.2)
-	if err := store.InsertBatch(context.Background(), []Span{one, two, embedding}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{one, two, embedding}); err != nil {
 		t.Fatal(err)
 	}
 	var input, output sql.NullInt64
@@ -193,7 +193,7 @@ func TestRootFallbackAndOrdering(t *testing.T) {
 	lateB.ParentSpanID, lateB.RequestModel, lateB.SessionID = spanID(9), "b", "late-session"
 	lateB.InputTokens, lateB.OutputTokens, lateB.CostUSD = i64(1), i64(1), f64(1)
 	lateB.Kind = "llm"
-	if err := store.InsertBatch(context.Background(), []Span{lateB, early, earlyB}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{lateB, early, earlyB}); err != nil {
 		t.Fatal(err)
 	}
 	var name, session, models string
@@ -209,7 +209,7 @@ func TestUpsertKeepsRowid(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(4), spanID(4), 1, 2)
 	span.Name, span.InputContent = "oldname", "oldcontent"
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	var before int64
@@ -217,7 +217,7 @@ func TestUpsertKeepsRowid(t *testing.T) {
 		t.Fatal(err)
 	}
 	span.Name, span.InputContent = "newname", "newcontent"
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	var after, count int64
@@ -248,7 +248,7 @@ func TestListTracesCursor(t *testing.T) {
 	for i := byte(1); i <= 5; i++ {
 		span := testSpan(traceID(i), spanID(i), start, start+1)
 		span.Name = "trace-" + string(rune('0'+i))
-		if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+		if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -290,7 +290,7 @@ func TestListTracesFilters(t *testing.T) {
 	spans[0].RequestModel = "small"
 	spans[1].RequestModel = "gpt-4o"
 	spans[2].RequestModel, spans[2].StatusCode = "gpt-4o-mini", 2
-	if err := store.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := store.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	checks := []struct {
@@ -327,7 +327,7 @@ func TestListSessions(t *testing.T) {
 	other.Kind, other.SessionID, other.RequestModel = "llm", "session-b", "other"
 	other.OutputTokens, other.CostUSD = i64(1), f64(0.03)
 	withoutSession := testSpan(traceID(4), spanID(4), 800, 900)
-	if err := store.InsertBatch(context.Background(), []Span{first, second, other, withoutSession}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{first, second, other, withoutSession}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -369,7 +369,7 @@ func TestDashboardPercentiles(t *testing.T) {
 		span.InputTokens, span.OutputTokens, span.CostUSD = i64(1), i64(1), f64(0.01)
 		spans = append(spans, span)
 	}
-	if err := store.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := store.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	data, err := store.Dashboard(context.Background(), day1.UnixNano(), day1.Add(48*time.Hour).UnixNano())
@@ -387,7 +387,7 @@ func TestGetTraceLoadsOnlyTreeFields(t *testing.T) {
 	span.Kind, span.RequestModel, span.InputTokens, span.OutputTokens = "llm", "gpt-4o", i64(10), i64(2)
 	span.InputContent, span.OutputContent = strings.Repeat("input", 1000), strings.Repeat("output", 1000)
 	span.Attributes, span.Events, span.Links, span.Resource, span.Scope = `{"large":"attribute"}`, `[{"large":"event"}]`, `[{"large":"link"}]`, `{"large":"resource"}`, `{"large":"scope"}`
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	_, tree, err := store.GetTrace(context.Background(), span.TraceID)
@@ -410,7 +410,7 @@ func TestDashboardRejectsInvalidStoredCost(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(8), spanID(8), 1, 2)
 	span.Kind, span.InputTokens, span.OutputTokens, span.CostUSD = "llm", i64(1), i64(1), f64(1)
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.w.Exec("UPDATE traces SET cost_usd=?", math.Inf(1)); err != nil {
@@ -425,7 +425,7 @@ func TestDashboardRejectsNonFiniteDuration(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(10), spanID(10), 1, 2)
 	span.Kind, span.RequestModel, span.InputTokens, span.OutputTokens, span.CostUSD = "llm", "model", i64(1), i64(1), f64(1)
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.w.Exec("UPDATE spans SET duration_ms=?", math.Inf(1)); err != nil {
@@ -440,7 +440,7 @@ func TestSearchLiteral(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(9), spanID(9), 1, 2)
 	span.Name, span.InputContent = "quoted trace", `he said "hi" OR bye`
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	hits, err := store.Search(context.Background(), `"hi" OR`, 10)
@@ -455,7 +455,7 @@ func TestSearchLiteral(t *testing.T) {
 func TestPurgeReportsCommittedDeletesWhenVacuumFails(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(9), spanID(9), 1, 2)
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	vacuumErr := errors.New("vacuum failed")
@@ -477,7 +477,7 @@ func TestPurgeMultipleBatches(t *testing.T) {
 		spans = append(spans, testSpan(fmt.Sprintf("%032x", i+1), spanID(1), 1, 2))
 	}
 	spans = append(spans, testSpan(fmt.Sprintf("%032x", 6), spanID(1), 10, 11))
-	if err := store.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := store.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	vacuumCalls := 0
@@ -513,7 +513,7 @@ func TestPurge(t *testing.T) {
 	old.Name = "oldspan"
 	current := testSpan(traceID(6), spanID(6), now.Add(-24*time.Hour).UnixNano(), now.Add(-24*time.Hour).Add(time.Second).UnixNano())
 	current.Name = "currentspan"
-	if err := store.InsertBatch(context.Background(), []Span{old, current}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{old, current}); err != nil {
 		t.Fatal(err)
 	}
 	deleted, err := store.Purge(context.Background(), now.Add(-30*24*time.Hour).UnixNano())
@@ -546,7 +546,7 @@ func TestSearchRankedOrdersByRelevanceNotTime(t *testing.T) {
 	weak.InputContent = "a long unrelated prompt about many topics that mentions timeout once among lots of other words"
 	newest := testSpan(traceID(3), spanID(3), 5, 6)
 	newest.InputContent = "nothing relevant here"
-	if err := store.InsertBatch(context.Background(), []Span{strong, weak, newest}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{strong, weak, newest}); err != nil {
 		t.Fatal(err)
 	}
 	hits, err := store.SearchRanked(context.Background(), "timeout", 10)
@@ -585,7 +585,7 @@ func seedRankedCorpus(t *testing.T, store *Store) {
 		}
 		spans = append(spans, span)
 	}
-	if err := store.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := store.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -637,7 +637,7 @@ func TestSearchRankedTiesResolveByInsertionOrder(t *testing.T) {
 		span.InputContent = "identical timeout body"
 		spans = append(spans, span)
 	}
-	if err := store.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := store.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	for run := 0; run < 5; run++ {

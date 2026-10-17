@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Ray0907/spanbox/internal/config"
+	"github.com/Ray0907/spanbox/internal/pipeline"
 	"github.com/Ray0907/spanbox/internal/store"
 )
 
@@ -92,7 +93,7 @@ func (deps Deps) importSpans(w http.ResponseWriter, r *http.Request) {
 		if len(batch) == 0 {
 			return nil
 		}
-		if err := deps.Store.InsertBatch(r.Context(), batch); err != nil {
+		if err := (pipeline.Pipeline{Store: deps.Store, Pricing: deps.Pricing}).Commit(r.Context(), pipeline.Import, batch); err != nil {
 			return err
 		}
 		count += len(batch)

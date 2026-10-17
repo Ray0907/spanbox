@@ -90,7 +90,7 @@ func TestRoundTripE2E(t *testing.T) {
 		StatusMessage: "bad\xff", RequestModel: "edge-model", StatusCode: 2,
 		InputTokens: &zero, OutputTokens: &zero, CacheReadTokens: &zero, CostUSD: &cost,
 	}
-	if err := source.InsertBatch(context.Background(), []store.Span{edge}); err != nil {
+	if _, err := source.InsertBatch(context.Background(), []store.Span{edge}); err != nil {
 		t.Fatal(err)
 	}
 	data := get(a.URL, "/export")
@@ -196,7 +196,7 @@ func TestExportE2ESpanFilters(t *testing.T) {
 	child.SpanID, child.ParentSpanID, child.Kind = strings.Repeat("2", 16), root.SpanID, "llm"
 	child.StartNs, child.EndNs = start.Add(2*time.Second).UnixNano(), start.Add(3*time.Second).UnixNano()
 	child.RequestModel, child.ResponseModel, child.StatusCode = "request-model", "response-model", 2
-	if err := db.InsertBatch(context.Background(), []store.Span{root, child}); err != nil {
+	if _, err := db.InsertBatch(context.Background(), []store.Span{root, child}); err != nil {
 		t.Fatal(err)
 	}
 	for _, filter := range []string{
@@ -267,7 +267,7 @@ func TestImportE2EMalformedAndRetention(t *testing.T) {
 	t.Cleanup(s.Close)
 	ctx := context.Background()
 	original := store.Span{TraceID: strings.Repeat("f", 32), SpanID: strings.Repeat("f", 16), Name: "existing", Kind: "other", StartNs: time.Now().UnixNano(), EndNs: time.Now().UnixNano() + 1}
-	if err := db.InsertBatch(ctx, []store.Span{original}); err != nil {
+	if _, err := db.InsertBatch(ctx, []store.Span{original}); err != nil {
 		t.Fatal(err)
 	}
 	var body bytes.Buffer
@@ -344,7 +344,7 @@ func TestExportE2EStreamsTenThousandSpans(t *testing.T) {
 		spans[n] = store.Span{TraceID: fmt.Sprintf("%032x", n+1), SpanID: fmt.Sprintf("%016x", n+1), Name: "stream", Kind: "other", StartNs: int64(n + 1), EndNs: int64(n + 2)}
 	}
 	for i := 0; i < len(spans); i += 500 {
-		if err := db.InsertBatch(context.Background(), spans[i:min(i+500, len(spans))]); err != nil {
+		if _, err := db.InsertBatch(context.Background(), spans[i:min(i+500, len(spans))]); err != nil {
 			t.Fatal(err)
 		}
 	}

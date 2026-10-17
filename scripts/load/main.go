@@ -105,7 +105,8 @@ func seed(db *store.Store, count int, now time.Time) {
 				InputTokens: &tokens, OutputTokens: &tokens, CostUSD: &cost,
 				InputContent: body, OutputContent: body, Attributes: "{}", Events: "[]", Links: "[]", Resource: "{}", Scope: "{}"})
 		}
-		must(db.InsertBatch(context.Background(), spans))
+		_, err := db.InsertBatch(context.Background(), spans)
+		must(err)
 	}
 }
 
