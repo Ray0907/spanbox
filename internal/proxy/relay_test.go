@@ -1115,3 +1115,60 @@ func TestNonInferenceIsCounted(t *testing.T) {
 		t.Fatalf("span count=%d err=%v", count, err)
 	}
 }
+
+func TestDroppedCaptureStillRecordsToolOrigin(t *testing.T) {
+	const issuing = `{"id":"issuing","output":[{"type":"function_call","call_id":"a","name":"bash","arguments":"{}"}]}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(string(body), "function_call_output") {
+			_, _ = w.Write([]byte(`{"id":"final","output":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(issuing))
+	}))
+	defer upstream.Close()
+	database, err := store.Open(t.TempDir() + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	handler, err := New(Config{OpenAIUpstream: upstream.URL, Store: database, Logf: t.Logf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httptest.NewServer(handler)
+	defer proxy.Close()
+	send := func(body string) {
+		t.Helper()
+		response, err := proxy.Client().Post(proxy.URL+"/proxy/openai/v1/responses", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+	}
+	for range cap(handler.captureSlots) {
+		handler.captureSlots <- struct{}{}
+	}
+	send(`{"model":"test"}`)
+	for range cap(handler.captureSlots) {
+		<-handler.captureSlots
+	}
+	if handler.DroppedCaptures() != 1 {
+		t.Fatalf("dropped=%d", handler.DroppedCaptures())
+	}
+	send(`{"previous_response_id":"issuing","input":[{"type":"function_call_output","call_id":"a","output":"file.txt"}]}`)
+	handler.Wait()
+	chat, err := Parse(Exchange{Vendor: "openai", Path: "/v1/responses", ServerAddress: handler.endpoints["openai"].base.Hostname(), RequestBody: []byte(`{"model":"test"}`), ResponseBody: []byte(issuing), StatusCode: 200}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var traceID, parentID, name string
+	if err := database.Reader().QueryRow(`SELECT trace_id, parent_span_id, name FROM spans WHERE kind='tool'`).Scan(&traceID, &parentID, &name); err != nil {
+		t.Fatal(err)
+	}
+	if traceID != chat.TraceID || parentID != chat.SpanID || name != "execute_tool bash" {
+		t.Fatalf("tool: trace=%s parent=%s name=%s, want trace=%s parent=%s", traceID, parentID, name, chat.TraceID, chat.SpanID)
+	}
+}
