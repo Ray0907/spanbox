@@ -106,6 +106,9 @@ const cacheCreationKey = "gen_ai.usage.cache_creation.input_tokens"
 // ParseCacheCreation reads cache creation tokens from stored attribute JSON.
 // NDJSON import does not run Span.
 func ParseCacheCreation(attributesJSON string) *int64 {
+	if !strings.Contains(attributesJSON, cacheCreationKey) {
+		return nil
+	}
 	var attrs map[string]any
 	if err := json.Unmarshal([]byte(attributesJSON), &attrs); err != nil {
 		return nil
