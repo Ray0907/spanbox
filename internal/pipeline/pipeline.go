@@ -65,12 +65,8 @@ func price(source Source, span store.Span) bool {
 	if span.CostUSD != nil || span.InputTokens == nil || span.OutputTokens == nil {
 		return false
 	}
-	switch source {
-	case OTLP, Import:
-		return span.Kind == "llm" || span.Kind == "embedding"
-	case Proxy:
+	if source == Proxy {
 		return true
-	default:
-		return false
 	}
+	return span.Kind == "llm" || span.Kind == "embedding"
 }
