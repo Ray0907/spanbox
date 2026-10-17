@@ -70,6 +70,7 @@ type toolOrigin struct {
 	endNs           int64
 	firstResultNs   int64
 	hasResult       bool
+	createdNs       int64
 }
 
 type Handler struct {
@@ -381,7 +382,16 @@ func (h *Handler) recordDroppedOrigins(exchange Exchange) {
 	if err != nil && chat.TraceID == "" {
 		return
 	}
-	h.recordToolCalls(exchange, chat, request, response)
+	h.toolMu.Lock()
+	defer h.toolMu.Unlock()
+	_, origins, err := h.toolSpansLocked(exchange, chat, request, response, nil)
+	if err != nil {
+		h.logf("lookup dropped proxy tool call: %v", err)
+		return
+	}
+	if err := h.commitProxy(nil, origins); err != nil {
+		h.logf("insert dropped proxy tool call: %v", err)
+	}
 }
 
 func (h *Handler) capture(exchange Exchange) {
@@ -401,8 +411,16 @@ func (h *Handler) capture(exchange Exchange) {
 		h.logf("normalize proxy span: %v", err)
 		return
 	}
+	// Serialize correlation through commit so concurrent results share the first timestamp.
+	h.toolMu.Lock()
+	defer h.toolMu.Unlock()
+	rawTools, origins, err := h.toolSpansLocked(exchange, raw, request, response, toolResults(exchange, request))
+	if err != nil {
+		h.logf("lookup proxy tool call: %v", err)
+		return
+	}
 	spans := []store.Span{span}
-	for _, rawTool := range h.toolSpans(exchange, raw, request, response) {
+	for _, rawTool := range rawTools {
 		tool, err := normalize.Span(rawTool, h.logf)
 		if err != nil {
 			h.logf("normalize proxy tool span: %v", err)
@@ -410,25 +428,76 @@ func (h *Handler) capture(exchange Exchange) {
 		}
 		spans = append(spans, tool)
 	}
-	if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
+	if err := h.commitProxy(spans, origins); err != nil {
 		h.logf("insert proxy span: %v", err)
 	}
 }
 
+// The caller holds toolMu; publish cache entries only after their transaction commits.
+func (h *Handler) commitProxy(spans []store.Span, origins map[string]toolOrigin) error {
+	if h.store != nil {
+		calls := make([]store.ProxyToolCall, 0, len(origins))
+		for key, origin := range origins {
+			calls = append(calls, store.ProxyToolCall{Key: key, TraceID: origin.traceID, SpanID: origin.spanID,
+				EndNs: origin.endNs, FirstResultNs: origin.firstResultNs, HasResult: origin.hasResult,
+				Name: origin.name, Arguments: jsonString(origin.arguments), CreatedNs: origin.createdNs})
+		}
+		if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing, ProxyCalls: calls}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
+			return err
+		}
+	}
+	h.cacheToolCalls(origins)
+	return nil
+}
+
 func (h *Handler) toolSpans(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse) []otlp.RawSpan {
-	spans := h.resultSpans(exchange, chat, request)
-	h.recordToolCalls(exchange, chat, request, response)
+	h.toolMu.Lock()
+	defer h.toolMu.Unlock()
+	spans, origins, err := h.toolSpansLocked(exchange, chat, request, response, toolResults(exchange, request))
+	if err != nil {
+		h.logf("lookup proxy tool call: %v", err)
+		return nil
+	}
+	h.cacheToolCalls(origins)
 	return spans
 }
 
-func (h *Handler) resultSpans(exchange Exchange, chat otlp.RawSpan, request map[string]any) []otlp.RawSpan {
-	results := toolResults(exchange, request)
-	h.toolMu.Lock()
-	defer h.toolMu.Unlock()
+// The caller holds toolMu until the spans and origins commit.
+func (h *Handler) toolSpansLocked(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse, results []toolResult) ([]otlp.RawSpan, map[string]toolOrigin, error) {
+	calls := toolCalls(array(response.outputMessages), len(array(request["contents"])))
+	origins := make(map[string]toolOrigin)
+	lookup := func(key string) (toolOrigin, bool, error) {
+		if origin, ok := origins[key]; ok {
+			return origin, true, nil
+		}
+		if origin, ok := h.toolCalls[key]; ok {
+			return origin, true, nil
+		}
+		if h.store == nil {
+			return toolOrigin{}, false, nil
+		}
+		call, ok, err := h.store.GetProxyToolCall(context.Background(), key)
+		if err != nil || !ok {
+			return toolOrigin{}, false, err
+		}
+		var arguments any
+		decoder := json.NewDecoder(strings.NewReader(call.Arguments))
+		decoder.UseNumber()
+		if err := decoder.Decode(&arguments); err != nil {
+			return toolOrigin{}, false, err
+		}
+		origin := toolOrigin{toolCall: toolCall{name: call.Name, arguments: arguments}, traceID: call.TraceID,
+			spanID: call.SpanID, endNs: call.EndNs, firstResultNs: call.FirstResultNs, hasResult: call.HasResult, createdNs: call.CreatedNs}
+		origins[key] = origin
+		return origin, true, nil
+	}
 	var spans []otlp.RawSpan
 	for _, result := range results {
 		key := toolKey(exchange.route(), chat, result.id)
-		origin, ok := h.toolCalls[key]
+		origin, ok, err := lookup(key)
+		if err != nil {
+			return nil, nil, err
+		}
 		if ok {
 			if result.name == "" {
 				result.name = origin.name
@@ -438,7 +507,7 @@ func (h *Handler) resultSpans(exchange Exchange, chat otlp.RawSpan, request map[
 			}
 			if !origin.hasResult {
 				origin.firstResultNs, origin.hasResult = chat.StartNs, true
-				h.toolCalls[key] = origin
+				origins[key] = origin
 			}
 		}
 		span := toolSpan(exchange.route(), result, chat)
@@ -448,16 +517,22 @@ func (h *Handler) resultSpans(exchange Exchange, chat otlp.RawSpan, request map[
 		}
 		spans = append(spans, span)
 	}
-	return spans
-}
-
-func (h *Handler) recordToolCalls(exchange Exchange, chat otlp.RawSpan, request map[string]any, response parsedResponse) {
-	calls := toolCalls(array(response.outputMessages), len(array(request["contents"])))
-	h.toolMu.Lock()
-	defer h.toolMu.Unlock()
 	for id, call := range calls {
 		key := toolKey(exchange.route(), chat, id)
+		if _, ok, err := lookup(key); err != nil {
+			return nil, nil, err
+		} else if ok {
+			continue
+		}
+		origins[key] = toolOrigin{toolCall: call, traceID: chat.TraceID, spanID: chat.SpanID, endNs: chat.EndNs, createdNs: time.Now().UnixNano()}
+	}
+	return spans, origins, nil
+}
+
+func (h *Handler) cacheToolCalls(origins map[string]toolOrigin) {
+	for key, origin := range origins {
 		if _, ok := h.toolCalls[key]; ok {
+			h.toolCalls[key] = origin
 			continue
 		}
 		if h.toolCalls == nil {
@@ -470,7 +545,7 @@ func (h *Handler) recordToolCalls(exchange Exchange, chat otlp.RawSpan, request 
 			h.toolOrder[h.nextTool] = key
 			h.nextTool = (h.nextTool + 1) % maxToolCalls
 		}
-		h.toolCalls[key] = toolOrigin{toolCall: call, traceID: chat.TraceID, spanID: chat.SpanID, endNs: chat.EndNs}
+		h.toolCalls[key] = origin
 	}
 }
 

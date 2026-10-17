@@ -23,9 +23,10 @@ const (
 type Publisher func([]store.Span, map[string]sql.NullFloat64)
 
 type Pipeline struct {
-	Store   *store.Store
-	Pricing *pricing.Table
-	Publish Publisher
+	Store      *store.Store
+	Pricing    *pricing.Table
+	Publish    Publisher
+	ProxyCalls []store.ProxyToolCall
 }
 
 func (p Pipeline) Commit(ctx context.Context, source Source, spans []store.Span) error {
@@ -50,6 +51,9 @@ func (p Pipeline) Commit(ctx context.Context, source Source, spans []store.Span)
 			spans[i].CostUSD = &cost
 			spans[i].CostSource = "pricing"
 		}
+	}
+	if source == Proxy {
+		return p.Store.InsertProxyBatch(ctx, spans, p.ProxyCalls)
 	}
 	costs, err := p.Store.InsertBatch(ctx, spans)
 	if err != nil {

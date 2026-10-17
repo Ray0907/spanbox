@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Proxy tool correlation is persisted in SQLite (schema v3) in the same transaction as spans. Tool spans retain their issuing parent and first-result duration after restarts or FIFO cache eviction; correlation records expire on retention sweeps (`RETENTION_DAYS=0` keeps them). Restart replays no longer add orphan tool spans.
 - The capture proxy derives `execute_tool <name>` spans from the tool results clients send back (Anthropic, OpenAI chat and Responses, ChatGPT Codex, Gemini, OpenAI-compatible). Tool name, arguments, result and error status are recorded; when the issuing call was seen, the span is its child and measures the gap to the first result. `scripts/proxy-tools-e2e.sh` covers it end to end. There is no agent root span, so a prompt's model calls are grouped by session. See [Tool spans](docs/proxy.md#tool-spans) for the limits.
 - Read-only `GET /events` SSE stream for live OTLP error, slow-span and trace-cost notifications, with Bearer/cookie authentication, bounded fan-out and 15-second keepalives.
 - `PURGE_BATCH_SIZE` (default 10, 1–200) and `FTS_MERGE_EVERY` (default 256, 1–1024) tune retention. Defaults keep `/search` p95 within 2x baseline and ingest p95 within 3x during a purge (500k spans: search 150ms baseline, 209ms during purge).

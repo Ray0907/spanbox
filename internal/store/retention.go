@@ -60,6 +60,9 @@ func (s *Store) Purge(ctx context.Context, cutoffNs int64, tuning ...PurgeOption
 	if _, err := s.w.ExecContext(ctx, "PRAGMA wal_autocheckpoint=0"); err != nil {
 		return 0, err
 	}
+	if _, err := s.w.ExecContext(ctx, "DELETE FROM proxy_tool_calls WHERE created_ns < ?", cutoffNs); err != nil {
+		return 0, err
+	}
 	return s.purge(ctx, cutoffNs, s.reclaim, options)
 }
 

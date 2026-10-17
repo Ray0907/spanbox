@@ -69,6 +69,17 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) (map[string]sql.N
 		return nil, err
 	}
 	defer tx.Rollback()
+	costs, err := insertBatch(ctx, tx, spans)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return costs, nil
+}
+
+func insertBatch(ctx context.Context, tx *sql.Tx, spans []Span) (map[string]sql.NullFloat64, error) {
 	statement, err := tx.PrepareContext(ctx, insertSpanSQL)
 	if err != nil {
 		return nil, err
@@ -106,9 +117,6 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) (map[string]sql.N
 			return nil, fmt.Errorf("%w: trace %s", ErrCostOutOfRange, traceID)
 		}
 		costs[traceID] = cost
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
 	}
 	return costs, nil
 }

@@ -366,19 +366,22 @@ try:
     assert len(big) == 1, ("a result captured before its issuing call must still yield exactly one tool span", big)
     print("PASS ordering: a result captured before its issuing call yields exactly one tool span (link is best effort)")
 
-    # --- Restart: correlation memory is lost, so a replay may add one orphan, never damage the original
+    # --- Restart: persisted correlation keeps the parent and first-result duration, without new orphans
     count = len(tool_spans())
+    orphans = {(x["trace_id"], x["span_id"]) for x in tool_spans() if not x["parent_span_id"]}
     original = {(x["trace_id"], x["span_id"]): x for x in tool_spans("bash")}
     stop()
     start()
     call(anthropic, "/v1/messages", {"model": "claude-test", "max_tokens": 64, "messages": history})
     time.sleep(1.5)
-    assert len(tool_spans()) <= count + 1, "replay after restart may add at most one orphan tool span"
+    assert len(tool_spans()) == count, "replay after restart must not add tool spans"
+    assert {(x["trace_id"], x["span_id"]) for x in tool_spans() if not x["parent_span_id"]} == orphans, \
+        "replay after restart must not add orphan tool spans"
     for (trace_id, span_id), x in original.items():
         now = next(y for y in tool_spans("bash") if (y["trace_id"], y["span_id"]) == (trace_id, span_id))
-        assert now["parent_span_id"] == x["parent_span_id"] and now["duration_ms"] == x["duration_ms"], \
+        assert now["parent_span_id"] and now["parent_span_id"] == x["parent_span_id"] and now["duration_ms"] == x["duration_ms"], \
             "a replay after restart must not alter an already linked tool span"
-    print("PASS restart: replay after a restart leaves the linked tool span intact (at most one extra orphan)")
+    print("PASS restart: replay keeps parent and duration, with no new tool spans or orphans")
 
     # --- Gemini: the same tool called again in a later turn is a new execution ---------
     gsess = {"X-Spanbox-Session": "gsess"}

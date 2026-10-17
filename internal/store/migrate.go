@@ -103,6 +103,19 @@ CREATE INDEX spans_kind ON spans(kind,
   start_ns, duration_ms, request_model, response_model, input_tokens, output_tokens, cost_usd);
 -- Broad FTS matches can sort row metadata without reading every span body.
 CREATE INDEX spans_search ON spans(start_ns DESC, span_id DESC);
+`, `
+CREATE TABLE IF NOT EXISTS proxy_tool_calls (
+  key             TEXT PRIMARY KEY,
+  trace_id        TEXT NOT NULL,
+  span_id         TEXT NOT NULL,
+  end_ns          INTEGER NOT NULL,
+  first_result_ns INTEGER NOT NULL,
+  has_result      INTEGER NOT NULL,
+  name            TEXT NOT NULL,
+  arguments       TEXT NOT NULL,
+  created_ns      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS proxy_tool_calls_created ON proxy_tool_calls(created_ns);
 `}
 
 func Open(dataDir string) (*Store, error) {

@@ -1,0 +1,1984 @@
+[
+  {
+    "name": "anthropic/v1/messages/''",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"msg_call_1\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}], \"stop_reason\": \"tool_use\", \"usage\": {\"input_tokens\": 10, \"output_tokens\": 5}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "254"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_2\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_2\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/v1/messages/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_2\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/v1/messages/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"msg_call_3\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}], \"stop_reason\": \"tool_use\", \"usage\": {\"input_tokens\": 10, \"output_tokens\": 5}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "254"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_4\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_4\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/v1/messages/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_4\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/v1/messages/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"msg_call_5\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}], \"stop_reason\": \"tool_use\", \"usage\": {\"input_tokens\": 10, \"output_tokens\": 5}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "254"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_6\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_6\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/v1/messages/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"call_c1\", \"name\": \"bash\", \"input\": {\"cmd\": \"ls\"}}]}, {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_c1\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_6\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "210"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_7\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "373"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_8\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "251"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_8\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "251"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_8\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "251"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_9\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "373"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_10\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_10\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_10\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_11\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "374"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_12\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_12\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/chat/completions/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_12\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_13\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_14\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_14\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_14\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_15\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_16\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_16\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_16\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_17\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_18\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_18\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_18\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/''",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_19\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_19\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_19\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_19\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_21\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_21\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_21\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_21\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_23\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_23\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_23\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_23\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/''",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_25\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}, \"id\": \"native_c1\"}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_26\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_26\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_26\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_27\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}, \"id\": \"native_c1\"}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_28\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_28\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_28\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_29\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}, \"id\": \"native_c1\"}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_30\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_30\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"id\": \"native_c1\", \"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"id\": \"native_c1\", \"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_30\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_31\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "374"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_32\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_32\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/unknown/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_32\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_33\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "374"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_34\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_34\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/unknown/'session-c1'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_34\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_35\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "374"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_36\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_36\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/chat/completions/unknown/'session\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "openai-compat/ua",
+        "path": "/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}, {\"role\": \"assistant\", \"tool_calls\": [{\"id\": \"call_c1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_c1\", \"content\": \"ok\"}]}",
+        "response": "{\"id\": \"chatcmpl_36\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/''/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_19\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_19\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_19\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_19\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/''/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_20\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_20\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/'session-c1'/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_21\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_21\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_21\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_21\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/'session-c1'/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_22\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_22\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/'session\\x00|\u96ea/\"'/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_23\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_23\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"function_call\", \"id\": \"fc_23\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\", \"status\": \"completed\"}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_23\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "chatgpt/codex/responses/unknown/'session\\x00|\u96ea/\"'/stream=true",
+    "exchanges": [
+      {
+        "vendor": "chatgpt",
+        "route": "",
+        "path": "/codex/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}, {\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}, {\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}], \"stream\": true}",
+        "response": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_item.added\ndata: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.output_item.done\ndata: {\"type\": \"response.output_item.done\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"msg_24\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_cx_24\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}}\n\n",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/''/output-only",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_13\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_14\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_14\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/'session-c1'/output-only",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_15\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_16\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_16\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "openai/v1/responses/'session\\x00|\u96ea/\"'/output-only",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"resp_17\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"function_call\", \"call_id\": \"call_c1\", \"name\": \"shell\", \"arguments\": \"{\\\"c\\\":1}\"}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "258"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_18\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/responses",
+        "request": "{\"model\": \"gpt-test\", \"input\": [{\"type\": \"function_call_output\", \"call_id\": \"call_c1\", \"output\": \"ok\"}]}",
+        "response": "{\"id\": \"resp_18\", \"object\": \"response\", \"model\": \"gpt-test\", \"status\": \"completed\", \"output\": [{\"type\": \"message\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"done\"}]}], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "262"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/''/positional",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_25\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_26\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_26\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/'session-c1'/positional",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_27\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_28\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_28\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session-c1",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "gemini/v1beta/models/gemini-test:generateContent/'session\\x00|\u96ea/\"'/positional",
+    "exchanges": [
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}]}",
+        "response": "{\"responseId\": \"gem_29\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "308"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_30\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      },
+      {
+        "vendor": "gemini",
+        "route": "",
+        "path": "/v1beta/models/gemini-test:generateContent",
+        "request": "{\"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": \"run\"}]}, {\"role\": \"model\", \"parts\": [{\"functionCall\": {\"name\": \"search\", \"args\": {\"q\": \"x\"}}}]}, {\"role\": \"user\", \"parts\": [{\"functionResponse\": {\"name\": \"search\", \"response\": {\"r\": \"ok\"}}}]}]}",
+        "response": "{\"responseId\": \"gem_30\", \"modelVersion\": \"gemini-test\", \"candidates\": [{\"content\": {\"role\": \"model\", \"parts\": [{\"text\": \"done\"}]}, \"finishReason\": \"STOP\"}], \"usageMetadata\": {\"promptTokenCount\": 10, \"candidatesTokenCount\": 4, \"totalTokenCount\": 14}}",
+        "session": "session\u0000|\u96ea/\"",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "249"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "boundary/'call_big'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_37\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"C1_BIG_CONTENT\", \"tool_calls\": [{\"id\": \"call_big\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "12583285"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"tool\", \"tool_call_id\": \"call_big\", \"content\": \"\\u96ea\\u0000|\\\"\"}]}",
+        "response": "{\"id\": \"chatcmpl_38\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "boundary/'\\x00|\u96ea/\"'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_39\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"\\u0000|\\u96ea/\\\"\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "383"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"tool\", \"tool_call_id\": \"\\u0000|\\u96ea/\\\"\", \"content\": \"\\u96ea\\u0000|\\\"\"}]}",
+        "response": "{\"id\": \"chatcmpl_40\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "boundary/''",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_41\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"call_1\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "373"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"tool\", \"tool_call_id\": \"call_1\", \"content\": \"\\u96ea\\u0000|\\\"\"}]}",
+        "response": "{\"id\": \"chatcmpl_42\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "boundary/'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'",
+    "exchanges": [
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "{\"id\": \"chatcmpl_43\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": null, \"tool_calls\": [{\"id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"type\": \"function\", \"function\": {\"name\": \"read\", \"arguments\": \"{\\\"path\\\":\\\"a\\\"}\"}}]}, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "2415"
+          ]
+        }
+      },
+      {
+        "vendor": "openai",
+        "route": "",
+        "path": "/v1/chat/completions",
+        "request": "{\"model\": \"gpt-test\", \"messages\": [{\"role\": \"tool\", \"tool_call_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"content\": \"\\u96ea\\u0000|\\\"\"}]}",
+        "response": "{\"id\": \"chatcmpl_44\", \"object\": \"chat.completion\", \"model\": \"gpt-test\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"done\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 10, \"completion_tokens\": 4, \"total_tokens\": 14}}",
+        "session": "boundary",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "252"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "anthropic/stream",
+    "exchanges": [
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"stream\": true, \"messages\": [{\"role\": \"user\", \"content\": \"run\"}]}",
+        "response": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_stream_45\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [], \"usage\": {\"input_tokens\": 10, \"output_tokens\": 1}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"call_stream\", \"name\": \"bash\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"cmd\\\":\\\"ls\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\"}, \"usage\": {\"output_tokens\": 5}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n",
+        "session": "stream",
+        "headers": {
+          "Content-Type": [
+            "text/event-stream"
+          ]
+        }
+      },
+      {
+        "vendor": "anthropic",
+        "route": "",
+        "path": "/v1/messages",
+        "request": "{\"model\": \"claude-test\", \"messages\": [{\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"call_stream\", \"content\": \"ok\"}]}]}",
+        "response": "{\"id\": \"msg_final_46\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-test\", \"content\": [{\"type\": \"text\", \"text\": \"done\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 20, \"output_tokens\": 3}}",
+        "session": "stream",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "211"
+          ]
+        }
+      }
+    ]
+  }
+]
