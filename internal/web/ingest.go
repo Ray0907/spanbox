@@ -14,6 +14,7 @@ import (
 	"github.com/Ray0907/spanbox/internal/config"
 	"github.com/Ray0907/spanbox/internal/normalize"
 	"github.com/Ray0907/spanbox/internal/otlp"
+	"github.com/Ray0907/spanbox/internal/pipeline"
 	"github.com/Ray0907/spanbox/internal/store"
 	collectorlogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectormetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
@@ -109,15 +110,10 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		if (span.Kind == "llm" || span.Kind == "embedding") && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
-			if cost, ok := deps.Pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, span.CacheCreationTokens); ok {
-				span.CostUSD = &cost
-				span.CostSource = "pricing"
-			}
-		}
 		spans = append(spans, span)
 	}
-	if err := deps.Store.InsertBatch(r.Context(), spans); err != nil {
+	err = pipeline.Pipeline{Store: deps.Store, Pricing: deps.Pricing, Publish: deps.publishIngestEvents}.Commit(r.Context(), pipeline.OTLP, spans)
+	if err != nil {
 		if errors.Is(err, store.ErrCostOutOfRange) {
 			writeStatus(w, mediaType, http.StatusBadRequest, 3, err.Error())
 		} else {
@@ -126,7 +122,6 @@ func (deps Deps) ingest(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	deps.publishIngestEvents(r.Context(), spans)
 	if signal == signalLogs {
 		writeExportResponse(w, mediaType, &collectorlogspb.ExportLogsServiceResponse{})
 	} else {

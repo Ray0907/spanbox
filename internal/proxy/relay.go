@@ -19,6 +19,7 @@ import (
 
 	"github.com/Ray0907/spanbox/internal/normalize"
 	"github.com/Ray0907/spanbox/internal/otlp"
+	"github.com/Ray0907/spanbox/internal/pipeline"
 	"github.com/Ray0907/spanbox/internal/pricing"
 	"github.com/Ray0907/spanbox/internal/store"
 	"github.com/klauspost/compress/zstd"
@@ -385,11 +386,6 @@ func (h *Handler) capture(exchange Exchange) {
 		h.logf("normalize proxy span: %v", err)
 		return
 	}
-	if h.pricing != nil && span.CostUSD == nil && span.InputTokens != nil && span.OutputTokens != nil {
-		if cost, ok := h.pricing.Cost(span.Provider, span.RequestModel, span.ResponseModel, span.InputTokens, span.OutputTokens, span.CacheReadTokens, span.CacheCreationTokens); ok {
-			span.CostUSD, span.CostSource = &cost, "pricing"
-		}
-	}
 	spans := []store.Span{span}
 	for _, rawTool := range h.toolSpans(exchange, raw, request, response) {
 		tool, err := normalize.Span(rawTool, h.logf)
@@ -399,7 +395,7 @@ func (h *Handler) capture(exchange Exchange) {
 		}
 		spans = append(spans, tool)
 	}
-	if err := h.store.InsertBatch(context.Background(), spans); err != nil {
+	if err := (pipeline.Pipeline{Store: h.store, Pricing: h.pricing}).Commit(context.Background(), pipeline.Proxy, spans); err != nil {
 		h.logf("insert proxy span: %v", err)
 	}
 }

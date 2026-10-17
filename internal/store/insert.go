@@ -55,23 +55,23 @@ ON CONFLICT(trace_id) DO UPDATE SET
   input_tokens=excluded.input_tokens, output_tokens=excluded.output_tokens, cost_usd=excluded.cost_usd,
   has_error=excluded.has_error, session_id=excluded.session_id, user_id=excluded.user_id, models=excluded.models`
 
-func (s *Store) InsertBatch(ctx context.Context, spans []Span) error {
+func (s *Store) InsertBatch(ctx context.Context, spans []Span) (map[string]sql.NullFloat64, error) {
 	if len(spans) == 0 {
-		return nil
+		return nil, nil
 	}
 	for _, span := range spans {
 		if span.CostUSD != nil && !costInRange(*span.CostUSD) {
-			return fmt.Errorf("%w: span %s", ErrCostOutOfRange, span.SpanID)
+			return nil, fmt.Errorf("%w: span %s", ErrCostOutOfRange, span.SpanID)
 		}
 	}
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
 	statement, err := tx.PrepareContext(ctx, insertSpanSQL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer statement.Close()
 	traceSet := make(map[string]struct{})
@@ -84,7 +84,7 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) error {
 			span.FinishReason, span.SessionID, span.UserID, span.TraceState, span.Attributes, span.Events,
 			span.Links, span.Resource, span.Scope,
 		); err != nil {
-			return err
+			return nil, err
 		}
 		traceSet[span.TraceID] = struct{}{}
 	}
@@ -93,17 +93,22 @@ func (s *Store) InsertBatch(ctx context.Context, spans []Span) error {
 		traceIDs = append(traceIDs, traceID)
 	}
 	sort.Strings(traceIDs)
+	costs := make(map[string]sql.NullFloat64, len(traceIDs))
 	for _, traceID := range traceIDs {
 		if _, err := tx.ExecContext(ctx, recomputeTraceSQL, sql.Named("tid", traceID)); err != nil {
-			return err
+			return nil, err
 		}
 		var cost sql.NullFloat64
 		if err := tx.QueryRowContext(ctx, "SELECT cost_usd FROM traces WHERE trace_id=?", traceID).Scan(&cost); err != nil {
-			return err
+			return nil, err
 		}
 		if cost.Valid && !costInRange(cost.Float64) {
-			return fmt.Errorf("%w: trace %s", ErrCostOutOfRange, traceID)
+			return nil, fmt.Errorf("%w: trace %s", ErrCostOutOfRange, traceID)
 		}
+		costs[traceID] = cost
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return costs, nil
 }

@@ -16,7 +16,7 @@ func TestPurgeErrorCleanupAndCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			for i := byte(1); i <= 3; i++ {
-				if err := db.InsertBatch(ctx, []Span{testSpan(traceID(i), spanID(1), 1, 2)}); err != nil {
+				if _, err := db.InsertBatch(ctx, []Span{testSpan(traceID(i), spanID(1), 1, 2)}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -96,7 +96,7 @@ func TestPurgeRejectsInvalidOptionsBeforeDeleting(t *testing.T) {
 		{{BatchSize: 2, MergeEvery: 1}, {BatchSize: 2, MergeEvery: 1}},
 	} {
 		db := openTestStore(t)
-		if err := db.InsertBatch(context.Background(), []Span{testSpan(traceID(1), spanID(1), 1, 2)}); err != nil {
+		if _, err := db.InsertBatch(context.Background(), []Span{testSpan(traceID(1), spanID(1), 1, 2)}); err != nil {
 			t.Fatal(err)
 		}
 		deleted, err := db.Purge(context.Background(), 3, options...)
@@ -119,7 +119,7 @@ func TestPurgeMergesPendingDeletesBeforeFinalReclaim(t *testing.T) {
 			spans[i].StartNs, spans[i].EndNs = 20, 21
 		}
 	}
-	if err := db.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := db.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	var before, after int64
@@ -147,7 +147,7 @@ func TestPurgeBatchUsesPerOperationLimit(t *testing.T) {
 		span.InputContent = "needle"
 		spans = append(spans, span)
 	}
-	if err := db.InsertBatch(context.Background(), spans); err != nil {
+	if _, err := db.InsertBatch(context.Background(), spans); err != nil {
 		t.Fatal(err)
 	}
 	if deleted, err := db.purgeBatch(context.Background(), 3, 2); err != nil || deleted != 2 {

@@ -49,7 +49,7 @@ func TestRunUserSQLRowsAndLimits(t *testing.T) {
 	store := openTestStore(t)
 	span := testSpan(traceID(1), spanID(1), 1, 2)
 	span.Name = "visible"
-	if err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
+	if _, err := store.InsertBatch(context.Background(), []Span{span}); err != nil {
 		t.Fatal(err)
 	}
 	result, err := store.RunUserSQL(context.Background(), "SELECT name FROM spans")

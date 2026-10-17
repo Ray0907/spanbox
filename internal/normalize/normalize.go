@@ -54,7 +54,7 @@ func Span(raw otlp.RawSpan, logf func(format string, args ...any)) (store.Span, 
 	}
 	result.OutputTokens = firstToken(raw.Attrs, logf, "gen_ai.usage.output_tokens", "gen_ai.usage.completion_tokens", "llm.token_count.completion", "ai.usage.completionTokens")
 	result.CacheReadTokens = firstToken(raw.Attrs, logf, "gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cache_read_input_tokens", "llm.token_count.prompt_details.cache_read")
-	result.CacheCreationTokens = firstToken(raw.Attrs, logf, "gen_ai.usage.cache_creation.input_tokens")
+	result.CacheCreationTokens = firstToken(raw.Attrs, logf, cacheCreationKey)
 	if details, ok := usageDetails(raw.Attrs["langfuse.observation.usage_details"], logf); ok {
 		if result.InputTokens == nil {
 			result.InputTokens = summedTokens(details, "input", "input_", logf)
@@ -99,6 +99,18 @@ func Span(raw otlp.RawSpan, logf func(format string, args ...any)) (store.Span, 
 	}
 	result.UserID = firstString(raw.Attrs, logf, "user.id", "langfuse.user.id", "enduser.id", "gen_ai.user", "llm.user")
 	return result, nil
+}
+
+const cacheCreationKey = "gen_ai.usage.cache_creation.input_tokens"
+
+// ParseCacheCreation reads cache creation tokens from stored attribute JSON.
+// NDJSON import does not run Span.
+func ParseCacheCreation(attributesJSON string) *int64 {
+	var attrs map[string]any
+	if err := json.Unmarshal([]byte(attributesJSON), &attrs); err != nil {
+		return nil
+	}
+	return firstToken(attrs, nil, cacheCreationKey)
 }
 
 func firstString(values map[string]any, logf func(string, ...any), keys ...string) string {
