@@ -172,6 +172,9 @@ func Open(dataDir string) (*Store, error) {
 	if err := writer.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return closeWriter(err)
 	}
+	if version > len(migrations) {
+		return closeWriter(fmt.Errorf("database version %d is newer than binary version %d in data directory %q", version, len(migrations), dataDir))
+	}
 	if version == 0 {
 		if err := writer.QueryRow("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").Scan(&objectCount); err != nil {
 			return closeWriter(err)

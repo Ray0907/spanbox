@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -97,6 +98,82 @@ func TestOpenNewAndExisting(t *testing.T) {
 	}
 	if got := dirInfo.Mode().Perm(); got != 0o700 {
 		t.Fatalf("directory mode = %o", got)
+	}
+}
+
+func TestOpenRejectsNewerDatabase(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "data")
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(dir, "spanbox.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	newerVersion := len(migrations) + 1
+	if _, err := raw.Exec(fmt.Sprintf("PRAGMA user_version = %d", newerVersion)); err != nil {
+		t.Fatal(err)
+	}
+	// Detect writes from switching to WAL before rejecting the newer schema.
+	if _, err := raw.Exec("PRAGMA journal_mode = DELETE"); err != nil {
+		t.Fatal(err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	store, err = Open(dir)
+	if store != nil {
+		if closeErr := store.Close(); closeErr != nil {
+			t.Error(closeErr)
+		}
+		t.Error("Open returned a store for a newer database")
+	}
+	if err == nil {
+		t.Error("Open succeeded for a newer database, want an error")
+	} else {
+		for _, want := range []string{fmt.Sprint(newerVersion), fmt.Sprint(len(migrations)), dir} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("Open error %q does not contain %q", err, want)
+			}
+		}
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Error("Open changed the newer database file")
+	}
+	raw, err = sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	var version int
+	if err := raw.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version != newerVersion {
+		t.Errorf("user_version = %d, want %d", version, newerVersion)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatalf("remove data directory after rejected Open: %v", err)
 	}
 }
 
