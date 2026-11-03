@@ -26,10 +26,11 @@ var templateFuncs = template.FuncMap{
 		}
 		return fmt.Sprintf("$%.6f", *value)
 	},
-	"duration": func(ms float64) string { return fmt.Sprintf("%.1f ms", ms) },
-	"percent":  func(value float64) string { return fmt.Sprintf("%.1f%%", value*100) },
-	"elapsed":  func(value time.Duration) string { return value.Round(time.Millisecond).String() },
-	"join":     strings.Join,
+	"duration":        func(ms float64) string { return fmt.Sprintf("%.1f ms", ms) },
+	"compactDuration": compactDuration,
+	"percent":         func(value float64) string { return fmt.Sprintf("%.1f%%", value*100) },
+	"elapsed":         func(value time.Duration) string { return value.Round(time.Millisecond).String() },
+	"join":            strings.Join,
 	"spanModel": func(span store.Span) string {
 		if span.ResponseModel != "" {
 			return span.ResponseModel

@@ -1,0 +1,25 @@
+{{define "content"}}
+<nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/sessions">Sessions</a></li><li aria-current="page">{{.SessionID}}</li></ol></nav>
+<section class="session-heading">
+  <h1>{{.SessionID}}</h1>
+  <p class="session-totals">{{.Summary.Turns}} turn{{if ne .Summary.Turns 1}}s{{end}} · {{.Summary.Traces}} trace{{if ne .Summary.Traces 1}}s{{end}} · {{tokens .Summary.InputTokens}} / {{tokens .Summary.OutputTokens}} tokens · {{if .Summary.CostUSD}}{{money .Summary.CostUSD}} · {{end}}<a href="/?session={{.SessionID}}">Trace list</a></p>
+</section>
+{{if .Truncated}}<p class="notice" role="status">Showing the first {{len .Turns}} traces of this session.</p>{{end}}
+<ol class="turns">
+{{range .Turns}}
+  <li class="turn-card{{if .HasError}} has-error{{end}}">
+    <header>
+      <h2>{{if .HasRoot}}Turn {{.Number}}{{else}}{{.Name}}{{end}}</h2>
+      <time datetime="{{timeUTC .StartNs}}">{{timeUTC .StartNs}}</time>
+      {{if .HasError}}<span class="turn-error">error</span>{{end}}
+    </header>
+    {{if .Prompt}}<p class="turn-prompt">{{.Prompt}}</p>{{end}}
+    {{if .Output}}<p class="turn-output">{{.Output}}</p>{{end}}
+    <footer>
+      <span>{{.SpanCount}} span{{if ne .SpanCount 1}}s{{end}}</span><span>{{tokens .InputTokens}} / {{tokens .OutputTokens}} tokens</span>{{if .CostUSD}}<span>{{money .CostUSD}}</span>{{end}}<span>{{compactDuration .DurationMs}}</span>
+      <a href="/traces/{{.TraceID}}" aria-label="Open trace for {{if .HasRoot}}Turn {{.Number}}{{else}}{{.Name}}{{end}}">Open trace</a>
+    </footer>
+  </li>
+{{end}}
+</ol>
+{{end}}

@@ -9,12 +9,14 @@ Open `http://localhost:<PORT>` (default `4318`). With `AUTH_TOKEN` set, `/login`
 | Traces | `/` | Trace list with filters |
 | Trace | `/traces/<trace_id>` | Span tree with timing, tokens, cost, status |
 | Span | `/spans/<trace_id>/<span_id>` | Prompt, completion, attributes, events |
-| Sessions | `/sessions` | Traces grouped by session |
+| Sessions | `/sessions` | Traces grouped by session. `/sessions?id=<session>` shows one session as ordered turn cards (prompt, latest output, spans, tokens, cost, link to the trace) |
 | Search | `/search?q=...` | Full-text search over span input, output, and name |
 | Dashboard | `/dashboard` | Cost, tokens, latency percentiles, and error rate by day |
 | SQL | `/sql` | Read-only console; see [Run SQL queries](sql-console.md) |
 
 ![Trace detail: span tree with prompt and completion](screenshots/trace.png)
+
+![Session: one card per agent turn with prompt, output, tokens and cost](screenshots/session.png)
 
 ## Filter traces
 

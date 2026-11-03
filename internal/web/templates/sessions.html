@@ -28,9 +28,9 @@
     {{range .Rows}}
       <tr>
         <td class="nowrap"><time datetime="{{timeUTC .LastNs}}">{{timeUTC .LastNs}}</time></td>
-        <td><a class="trace-link" href="/?session={{.SessionID}}">{{.SessionID}}</a></td>
+        <td><a class="trace-link" href="/sessions?id={{.SessionID}}">{{.SessionID}}</a></td>
         <td>{{.ServiceName}}</td><td>{{if .Models}}{{.Models}}{{else}}—{{end}}</td>
-        <td class="number">{{.TraceCount}}</td><td class="number">{{.LLMCount}}</td>
+        <td class="number"><a href="/?session={{.SessionID}}" aria-label="{{.TraceCount}} trace{{if ne .TraceCount 1}}s{{end}} in {{.SessionID}}">{{.TraceCount}}</a></td><td class="number">{{.LLMCount}}</td>
         <td class="number">{{tokens .InputTokens}} / {{tokens .OutputTokens}}</td><td class="number">{{money .CostUSD}}</td>
         <td class="nowrap"><time datetime="{{timeUTC .FirstNs}}">{{timeUTC .FirstNs}}</time></td>
       </tr>

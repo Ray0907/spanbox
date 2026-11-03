@@ -265,6 +265,10 @@ func (deps Deps) sessions(w http.ResponseWriter, r *http.Request) {
 		deps.agentSessions(w, r)
 		return
 	}
+	if id := r.URL.Query().Get("id"); id != "" {
+		deps.sessionDetail(w, r, id)
+		return
+	}
 	page := sessionsPage{layoutData: layoutData{Title: "Sessions", Section: "sessions", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Range: r.URL.Query().Get("range"), From: r.URL.Query().Get("from"), To: r.URL.Query().Get("to")}
 	from, to, err := parseRange(page.Range, page.From, page.To)
 	filter := store.SessionFilter{FromNs: from, ToNs: to, Limit: 51}

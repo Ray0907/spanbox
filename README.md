@@ -5,9 +5,10 @@ spanbox is a single-binary OpenTelemetry trace monitor for LLM applications. It 
 ![Trace detail: span tree with prompt and completion](docs/screenshots/trace.png)
 
 <details>
-<summary>More screenshots: trace list and dashboard</summary>
+<summary>More screenshots: trace list, session and dashboard</summary>
 
 ![Trace list](docs/screenshots/traces.png)
+![Session: one card per agent turn with prompt, output, tokens and cost](docs/screenshots/session.png)
 ![Dashboard: cost, tokens, latency percentiles, error rate by day](docs/screenshots/dashboard.png)
 
 </details>

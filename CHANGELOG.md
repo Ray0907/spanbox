@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Session detail page at `/sessions?id=<session>`: the session's traces oldest first, one card per trace with the agent root's prompt and latest output, span count, tokens, cost and a link to the trace. Traces without an agent root (orphan tool traces, pre-v4 session traces) are listed but not numbered as turns. The Sessions list links the session ID to this page and the trace count to the filtered trace list. No schema change.
+
 ## 0.5.0 — 2026-10-17
 
 ### Added
