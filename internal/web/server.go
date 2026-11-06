@@ -90,6 +90,16 @@ func NewHandler(deps Deps) http.Handler {
 		}
 		staticHandler.ServeHTTP(w, r)
 	})))
+	mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
+		page, err := fs.ReadFile(staticFiles, "ui/index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(page)
+	})
 	mux.HandleFunc("/traces/", deps.trace)
 	mux.HandleFunc("/spans/", deps.span)
 	mux.HandleFunc("/sessions", deps.sessions)

@@ -134,6 +134,9 @@ async function rowTap(page, name) {
   const output = fs.openSync(path.join(__dirname, 'server.log'), 'w');
   report(`Started ${new Date().toISOString()}\nCommand: pnpm --dir e2e-mobile test\nServer: ${base}\nAUTH_TOKEN=${token}\nBrowser: Playwright Chromium, iPhone 13, hasTouch=true, viewport=390x844`);
   try {
+    // The optional UI at /ui is built from web-ui and embedded into the binary.
+    execFileSync('pnpm', ['--dir', 'web-ui', 'install', '--frozen-lockfile'], { cwd: root, stdio: 'inherit' });
+    execFileSync('pnpm', ['--dir', 'web-ui', 'build'], { cwd: root, stdio: 'inherit' });
     const binary = path.join(temporary, 'spanbox');
     execFileSync('go', ['build', '-o', binary, './cmd/spanbox'], { cwd: root, stdio: 'inherit' });
     server = spawn(binary, [], { cwd: root, env: { ...process.env, PORT: String(port), AUTH_TOKEN: token, DATA_DIR: path.join(temporary, 'data'), RETENTION_DAYS: '0' }, stdio: ['ignore', output, output] });
@@ -211,6 +214,31 @@ async function rowTap(page, name) {
     await page.goto(`${base}/sql`);
     const textareaSize = await page.locator('textarea').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
     check('SQL textarea computed font-size >=16px', textareaSize >= 16, `${textareaSize}px`);
+
+    // Optional React UI at /ui: same real server, same login cookie, same CSP.
+    await page.goto(`${base}/ui`);
+    await page.locator('tbody tr').nth(1).waitFor();
+    check('ui traces: both seeded traces listed', await page.locator('tbody tr').count() === 2);
+    const uiWidth = async () => page.evaluate(() => ({ viewport: innerWidth, html: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
+    let width = await uiWidth();
+    check('ui traces: no horizontal page overflow at 390px', width.viewport === 390 && width.html <= 390 && width.body <= 390, JSON.stringify(width));
+    await page.screenshot({ path: path.join(__dirname, 'ui-traces.png') });
+    await page.locator('tbody a').first().tap();
+    await page.getByRole('heading', { name: 'Span tree' }).waitFor();
+    const spanButtons = await page.locator('main button').count();
+    check('ui trace: every span is a button', spanButtons === 3, `${spanButtons} buttons`);
+    // The first LLM span is selected by default; picking the root span must load its own panel.
+    check('ui trace: first LLM span is selected by default', await page.locator('main button[aria-current="true"]').innerText().then(text => text.includes('chat gpt-4o')));
+    const rootSpan = page.locator('main button').first();
+    const rootText = await rootSpan.innerText();
+    const uiSpan = page.waitForResponse(response => response.url().includes('/spans/') && response.status() === 200);
+    await rootSpan.tap();
+    await uiSpan;
+    await page.waitForFunction(() => document.querySelector('main button')?.getAttribute('aria-current') === 'true');
+    check('ui trace: touch span selection loads the panel and marks it current', true, rootText.replace(/\s+/g, ' '));
+    width = await uiWidth();
+    check('ui trace: no horizontal page overflow at 390px', width.viewport === 390 && width.html <= 390 && width.body <= 390, JSON.stringify(width));
+    await page.screenshot({ path: path.join(__dirname, 'ui-trace.png') });
     check('zero console errors / uncaught page errors', errors.length === 0, JSON.stringify(errors));
   } catch (error) {
     failures++;

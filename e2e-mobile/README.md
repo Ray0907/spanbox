@@ -15,7 +15,7 @@ data, then stops the server and removes that data. Existing repository data is u
 
 Playwright Chromium runs the iPhone 13 profile with `hasTouch: true` at 390×844.
 The test exercises login, traces, span selection, search, sessions and dashboard,
-plus SQL for a real textarea. Each assertion is recorded in `results.log`; server
+plus SQL for a real textarea, and the experimental `/ui` (it builds `web-ui` first). Each assertion is recorded in `results.log`; server
 output is in `server.log`. Viewport screenshots are saved beside the script.
 Full-page screenshots are deliberately avoided: Playwright 1.61 resets Chromium
 touch emulation when capturing taller-than-viewport pages.

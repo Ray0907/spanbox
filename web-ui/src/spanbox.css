@@ -1,0 +1,33 @@
+/* spanbox palette mapped onto Astryx tokens. Values from spanbox app.css (dark, light). */
+@font-face{font-family:"Bricolage Grotesque";font-weight:200 800;font-stretch:75% 100%;font-display:swap;src:url(/bricolage-grotesque-latin.woff2) format("woff2")}
+@font-face{font-family:"Source Sans 3";font-weight:200 900;font-display:swap;src:url(/source-sans-3-latin.woff2) format("woff2")}
+[data-astryx-theme="neutral"] {
+  --color-background-body: light-dark(#f7f3f5, #09080b);
+  --color-background-surface: light-dark(#fffdfd, #111014);
+  --color-background-card: light-dark(#fffdfd, #111014);
+  --color-background-popover: light-dark(#fffdfd, #19171c);
+  --color-background-muted: light-dark(#f0eaed, #19171c);
+  --color-neutral: light-dark(#e9e1e5, #211e24);
+  --color-border: light-dark(#d7cbd1, #342d32);
+  --color-border-emphasized: light-dark(#9a8790, #75636d);
+  --color-text-primary: light-dark(#241d21, #f5eff3);
+  --color-text-secondary: light-dark(#655860, #b7aab1);
+  --color-accent: light-dark(#a90f58, #ff5caa);
+  --color-text-accent: light-dark(#a90f58, #ff5caa);
+  --color-icon-accent: light-dark(#a90f58, #ff5caa);
+  --color-accent-muted: light-dark(#f9deea, #321422);
+  --color-on-accent: light-dark(#ffffff, #1c0a13);
+  --color-error: light-dark(#a82932, #ff8b8f);
+  --color-text-error: light-dark(#a82932, #ff8b8f);
+  --color-error-muted: light-dark(#f9e4e5, #34191d);
+  --color-on-error-muted: light-dark(#a82932, #ff8b8f);
+  --color-success: light-dark(#14704d, #5dd7a4);
+  --color-text-success: light-dark(#14704d, #5dd7a4);
+  --color-success-muted: light-dark(#dff1e9, #122b23);
+  --color-on-success-muted: light-dark(#14704d, #5dd7a4);
+  --color-chart-neutral: light-dark(#655860, #b7aab1);
+  --radius-full: 2px;
+  --radius-element: 2px; --radius-container: 2px; --radius-inner: 2px;
+  --font-family-body: "Source Sans 3", -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-family-heading: "Bricolage Grotesque", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}

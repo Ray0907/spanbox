@@ -38,6 +38,22 @@ The trace list and export share these filters:
 
 The dashboard defaults to the last 24 hours. It reads a covering index and does not load span bodies. The same numbers are available as JSON at `/dashboard/data`.
 
+## Experimental UI
+
+`/ui` is a second front end for the trace list and the trace detail. It reads the same `?format=json` endpoints with the same login cookie, so it adds no route that returns data and needs no configuration. The other pages stay on the HTML UI and are linked from its header.
+
+Release binaries do not include it yet. To add it, build it before `go build`:
+
+```sh
+pnpm --dir web-ui install --frozen-lockfile
+pnpm --dir web-ui build
+go build ./cmd/spanbox
+```
+
+Without the build, `/ui` returns 404. The Content Security Policy is unchanged.
+
+![Trace detail in the experimental UI](screenshots/ui-trace.png)
+
 ## Mobile
 
 The UI is responsive and tuned for phones. `e2e-mobile` holds the mobile check.

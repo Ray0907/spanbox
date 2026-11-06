@@ -8,3 +8,5 @@ __pycache__/
 e2e-mobile/node_modules/
 e2e-mobile/results.log
 e2e-mobile/server.log
+web-ui/node_modules/
+internal/web/static/ui/
