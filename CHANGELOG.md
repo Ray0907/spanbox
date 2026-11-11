@@ -6,6 +6,9 @@
 - Experimental UI at `/ui` for the trace list and trace detail, built from `web-ui/` and embedded in the binary. It reads the existing `?format=json` endpoints with the login cookie, so it adds no data route, and it works under the unchanged CSP. Release binaries do not include it yet: run `pnpm --dir web-ui install --frozen-lockfile && pnpm --dir web-ui build` before `go build`; without the build `/ui` returns 404.
 - Session detail page at `/sessions?id=<session>`: the session's traces oldest first, one card per trace with the agent root's prompt and latest output, span count, tokens, cost and a link to the trace. Traces without an agent root (orphan tool traces, pre-v4 session traces) are listed but not numbered as turns. The Sessions list links the session ID to this page and the trace count to the filtered trace list. No schema change.
 
+### Changed
+- Go raised to 1.26.11 and `golang.org/x/net`, `google.golang.org/grpc` and `github.com/klauspost/compress` raised to versions that clear known vulnerabilities. CI now runs `govulncheck` and fails on a new reachable one.
+
 ## 0.5.0 — 2026-10-17
 
 ### Added
