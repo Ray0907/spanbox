@@ -11,12 +11,35 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm install -g pnpm@12.11.2
+      - name: build web-ui
+        run: |
+          pnpm --dir web-ui install --frozen-lockfile
+          pnpm --dir web-ui build
       - run: go vet ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - run: go test -race ./...
       - run: CGO_ENABLED=0 go build ./cmd/spanbox
+      - run: python3 scripts/unix-smoke.py ./spanbox --require-ui
       - run: docker build -t spanbox:ci .
+      - name: Image serves /ui and its assets
+        run: |
+          # unix-smoke.py starts a local binary, so the container gets an equivalent curl check.
+          docker run -d --name spanbox-ci -p 14318:4318 -e AUTH_TOKEN=ci-smoke spanbox:ci
+          trap 'docker rm -f spanbox-ci >/dev/null' EXIT
+          # the port forward accepts connections before spanbox is up, so retry on any failure
+          for _ in $(seq 40); do curl -fsS -o /dev/null http://127.0.0.1:14318/healthz && break; sleep 0.5; done
+          curl -fsS -o /dev/null http://127.0.0.1:14318/healthz
+          curl -fsS -c jar -d token=ci-smoke -o /dev/null http://127.0.0.1:14318/login
+          curl -fsS -b jar -o ui.html http://127.0.0.1:14318/ui
+          grep -q 'id="root"' ui.html
+          assets=$(grep -oE '/static/ui/[^"]+\.(js|css)' ui.html | sort -u)
+          test -n "$assets"
+          for a in $assets; do curl -fsS -o /dev/null "http://127.0.0.1:14318$a"; done
 
   windows:
     runs-on: windows-latest

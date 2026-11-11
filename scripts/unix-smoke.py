@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check a built Unix binary: OTLP ingest/read and zero-exit SIGINT/SIGTERM."""
+"""Check a built Unix binary: OTLP ingest/read and zero-exit SIGINT/SIGTERM.
+
+With --require-ui, also check that /ui and the /static/ui assets it references answer 200.
+"""
+from http.client import HTTPConnection
 import json
 import os
 from pathlib import Path
@@ -10,9 +14,12 @@ import sys
 import tempfile
 import time
 import urllib.error
+import re
 import urllib.request
 
-binary = str(Path(sys.argv[1]).resolve(strict=True))
+args = [a for a in sys.argv[1:] if a != "--require-ui"]
+require_ui = len(args) != len(sys.argv) - 1
+binary = str(Path(args[0]).resolve(strict=True))
 http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 token = "unix-smoke-secret"
 trace_id, span_id = "11" * 16, "22" * 8
@@ -25,6 +32,29 @@ def request(base, path, body=None):
     with http.open(req, timeout=10) as response:
         assert response.status == 200, (path, response.status)
         return response.read()
+
+
+def check_ui(port):
+    conn = HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("POST", "/login", "token=" + token, {"Content-Type": "application/x-www-form-urlencoded"})
+    login = conn.getresponse()
+    login.read()
+    cookie = login.getheader("Set-Cookie", "").split(";")[0]
+    assert login.status == 302 and cookie.startswith("spanbox_session="), ("login", login.status)
+
+    def get(path):
+        conn.request("GET", path, headers={"Cookie": cookie})
+        response = conn.getresponse()
+        return response.status, response.read().decode("utf-8", "replace")
+
+    status, page = get("/ui")
+    assert status == 200 and 'id="root"' in page, ("/ui", status)
+    assets = sorted(set(re.findall(r'(?:src|href)="(/static/ui/[^"]+\.(?:js|css))"', page)))
+    assert assets, "/ui references no /static/ui script or stylesheet"
+    for asset in assets:
+        assert get(asset)[0] == 200, (asset, "not served")
+    conn.close()
+    print("PASS /ui shell and " + str(len(assets)) + " referenced assets answer 200", flush=True)
 
 
 for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
@@ -63,6 +93,8 @@ for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
                 assert len(trace["spans"]) == 1, trace
                 assert trace["spans"][0]["span_id"] == span_id, trace
                 assert trace["spans"][0]["name"] == "unix-smoke", trace
+                if require_ui:
+                    check_ui(port)
                 assert process.poll() is None, "binary exited before signal"
                 process.send_signal(shutdown_signal)
                 assert process.wait(timeout=15) == 0, ("non-graceful exit", process.returncode)

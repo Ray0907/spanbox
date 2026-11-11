@@ -42,7 +42,7 @@ The dashboard defaults to the last 24 hours. It reads a covering index and does 
 
 `/ui` is a second front end for the trace list and the trace detail. It reads the same `?format=json` endpoints with the same login cookie, so it adds no route that returns data and needs no configuration. The other pages stay on the HTML UI and are linked from its header.
 
-Release binaries do not include it yet. To add it, build it before `go build`:
+Release binaries and the container image include it. A source build includes it only after the UI is built, before `go build`:
 
 ```sh
 pnpm --dir web-ui install --frozen-lockfile
@@ -50,7 +50,7 @@ pnpm --dir web-ui build
 go build ./cmd/spanbox
 ```
 
-Without the build, `/ui` returns 404. The Content Security Policy is unchanged.
+A source build without that step still answers 404 on `/ui`. The Content Security Policy is unchanged.
 
 ![Trace detail in the experimental UI](screenshots/ui-trace.png)
 

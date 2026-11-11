@@ -2,3 +2,7 @@
 .impeccable
 data
 spanbox
+web-ui/node_modules
+internal/web/static/ui
+tmp
+e2e-mobile

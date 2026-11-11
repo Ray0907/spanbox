@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Experimental UI at `/ui` for the trace list and trace detail, built from `web-ui/` and embedded in the binary. It reads the existing `?format=json` endpoints with the login cookie, so it adds no data route, and it works under the unchanged CSP. Release binaries do not include it yet: run `pnpm --dir web-ui install --frozen-lockfile && pnpm --dir web-ui build` before `go build`; without the build `/ui` returns 404.
+- Experimental UI at `/ui` for the trace list and trace detail, built from `web-ui/` and embedded in the binary. It reads the existing `?format=json` endpoints with the login cookie, so it adds no data route, and it works under the unchanged CSP. Release binaries and the container image include it. A source build includes it after `pnpm --dir web-ui install --frozen-lockfile && pnpm --dir web-ui build` before `go build`; without that step `/ui` returns 404.
 - Session detail page at `/sessions?id=<session>`: the session's traces oldest first, one card per trace with the agent root's prompt and latest output, span count, tokens, cost and a link to the trace. Traces without an agent root (orphan tool traces, pre-v4 session traces) are listed but not numbered as turns. The Sessions list links the session ID to this page and the trace count to the filtered trace list. No schema change.
 
 ### Changed
