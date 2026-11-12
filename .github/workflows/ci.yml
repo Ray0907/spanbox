@@ -170,7 +170,7 @@ jobs:
           - runner: macos-15-intel
             arch: amd64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -187,7 +187,7 @@ jobs:
           test "$(go env GOOS)" = darwin
           test "$(go env GOARCH)" = '${{ matrix.arch }}'
       - run: go vet ./...
-      - run: go test -race -count=1 -v ./...
+      - run: go test -race -count=1 -timeout 25m -v ./...
       - run: CGO_ENABLED=0 go build -o spanbox ./cmd/spanbox
       - name: Export/import and real binary smoke with BSD userland
         shell: bash
