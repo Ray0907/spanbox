@@ -63,7 +63,12 @@ func TestSPAStaticAssets(t *testing.T) {
 			response := request(t, handler, http.MethodGet, requestPath, "", "", nil)
 			ext := filepath.Ext(path)
 			counts[ext]++
-			if response.Code != http.StatusOK || response.Body.String() != string(original) || response.Header().Get("Content-Type") != mime.TypeByExtension(ext) {
+			wantType := mime.TypeByExtension(ext)
+			if ext == ".woff2" {
+				// Hosts without a system MIME database have no .woff2 entry; the server then sniffs the same type.
+				wantType = "font/woff2"
+			}
+			if response.Code != http.StatusOK || response.Body.String() != string(original) || response.Header().Get("Content-Type") != wantType {
 				t.Fatalf("asset: status=%d type=%q matches=%v", response.Code, response.Header().Get("Content-Type"), response.Body.String() == string(original))
 			}
 		})
