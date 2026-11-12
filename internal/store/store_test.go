@@ -143,7 +143,7 @@ func TestOpenRejectsNewerDatabase(t *testing.T) {
 	if err == nil {
 		t.Error("Open succeeded for a newer database, want an error")
 	} else {
-		for _, want := range []string{fmt.Sprint(newerVersion), fmt.Sprint(len(migrations)), dir} {
+		for _, want := range []string{fmt.Sprint(newerVersion), fmt.Sprint(len(migrations)), fmt.Sprintf("%q", dir)} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("Open error %q does not contain %q", err, want)
 			}
