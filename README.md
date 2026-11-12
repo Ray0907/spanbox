@@ -68,7 +68,7 @@ When `AUTH_TOKEN` is unset, these routes require no authentication (except `/sql
 | `/login`, `/static/` | Public login form and static assets; `POST /login` exchanges the token for a session cookie |
 | `POST /`, `POST /v1/traces`, `POST /v1/logs`, `POST /v1/metrics` | Require `Authorization: Bearer <AUTH_TOKEN>`; metrics are accepted and discarded |
 | `POST /api/public/otel/v1/traces` | Requires Bearer auth or Basic auth with `AUTH_TOKEN` as the password; the username is ignored |
-| `GET /`, `/sessions`, `/search`, `/traces/`, `/spans/` | HTML pages require a login cookie (otherwise redirect to `/login`); `?format=json` also accepts Bearer auth and returns JSON 401 when unauthorized |
+| `GET /`, `/sessions`, `/search`, `/traces/`, `/spans/` | App pages require a login cookie (otherwise redirect to `/login`); `?format=json` also accepts Bearer auth and returns JSON 401 when unauthorized |
 | `/dashboard` | Requires a login cookie; otherwise redirects to `/login` |
 | `/dashboard/data` | Accepts Bearer auth or a login cookie; returns JSON 401 when unauthorized |
 | `/sql` | Requires a login cookie; Bearer auth alone does not grant access |
@@ -257,7 +257,7 @@ On a laptop, 9,000 spans sent in one burst land in SQLite in under two seconds. 
 
 ## JSON API
 
-Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of HTML. `/dashboard/data` is JSON without a format parameter. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>` or use a login cookie. Authentication failures return `{"error": "unauthorized"}` with status 401 on these JSON routes. The `?format=json` handlers return `{"error": "..."}` for validation/not-found (400/404) and store (500) errors; `/dashboard/data` instead returns plain-text handler errors (400/500), and unsupported methods need not return JSON. The HTML dashboard still requires a login cookie.
+Add `?format=json` to the trace, session, search, trace detail and span pages to get JSON instead of the app page. `/dashboard/data` is JSON without a format parameter. With `AUTH_TOKEN` set, send `Authorization: Bearer <token>` or use a login cookie. Authentication failures return `{"error": "unauthorized"}` with status 401 on these JSON routes. The `?format=json` handlers return `{"error": "..."}` for validation/not-found (400/404) and store (500) errors; `/dashboard/data` instead returns plain-text handler errors (400/500), and unsupported methods need not return JSON. The dashboard page still requires a login cookie.
 
 | Route | Returns |
 |---|---|
