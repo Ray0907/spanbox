@@ -27,6 +27,11 @@ module.exports = async function ({base, token}) {
   add(4, 'parity-singular', 'invoke_agent', 'x'.repeat(599) + 'yz' + 'w'.repeat(100), 'singular output');
   // No usage or price on this trace: unknown totals must remain unknown.
   spans.at(-1).attributes = spans.at(-1).attributes.filter(a => !a.key.startsWith('gen_ai.usage.') && a.key !== 'gen_ai.request.model');
+  for (const n of [5, 6]) {
+    add(n, 'parity-layout-long', 'execute_tool', 'long prompt '.repeat(80), 'long output '.repeat(80));
+    spans.at(-1).name = 'Long orphan title 中🧪 ' + 'unbroken'.repeat(40);
+    if (n === 5) spans.at(-1).status = {code: 'STATUS_CODE_ERROR', message: 'layout error'};
+  }
   for (let n = 0; n < 201; n++) add(10 + n, 'parity-truncated', 'invoke_agent', `turn prompt ${n}`, `turn output ${n}`);
   for (let n = 0; n < 51; n++) add(220 + n, `parity-page-${n}`, 'invoke_agent', 'page prompt', 'page output');
   for (let n = 0; n < 102; n++) add(300 + n, 'parity-search', 'chat', `needle-literal a&b 中 ${n}`, `search output ${n}`);

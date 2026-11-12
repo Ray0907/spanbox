@@ -78,6 +78,7 @@ module.exports = function ({base, token, check, inspect, rowTap}) {
     await page.locator('.turn-card').nth(3).waitFor();
     await current('Sessions');
     await inspect(page, 'session-detail');
+    await require('./session-turn-layout.cjs')(page, check);
     await chrome();
     check('session: visible links have 44px tap targets', await page.locator('main a').evaluateAll(links => links.every(link => link.getBoundingClientRect().height >= 44)));
     const labels = await page.locator('.turn-card h2').allTextContents();

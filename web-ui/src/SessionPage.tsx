@@ -14,6 +14,8 @@ import {ErrorLine, HTTPError, pageStyles, useJSON, fmtCost} from './telemetry';
 const styles = stylex.create({
   turns: {listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 16},
   text: {whiteSpace: 'pre-wrap'},
+  // Preserve reading order while keeping the timestamp at the outside edge, even after wrapping.
+  turnMeta: {marginInlineStart: 'auto', flexDirection: 'row-reverse'},
 });
 export default function SessionPage({id}: {id: string}) {
   const {data, error, loading} = useJSON<SessionDetail>(sessionDetailQuery(id));
@@ -34,8 +36,10 @@ export default function SessionPage({id}: {id: string}) {
           <Card><VStack gap={3} width="100%">
             <HStack gap={2} wrap="wrap" justify="between" width="100%">
               <Heading level={2}>{turnLabel(turn)}</Heading>
-              <Text type="supporting" color="secondary"><time dateTime={sessionTime(turn.start_ns)}>{sessionTime(turn.start_ns)}</time></Text>
-              {turn.has_error && <Badge variant="error" label="error" />}
+              <HStack gap={2} xstyle={styles.turnMeta}>
+                <Text type="supporting" color="secondary"><time dateTime={sessionTime(turn.start_ns)}>{sessionTime(turn.start_ns)}</time></Text>
+                {turn.has_error && <Badge variant="error" label="error" />}
+              </HStack>
             </HStack>
             {turn.prompt && <Text xstyle={styles.text}>{turn.prompt}</Text>}
             {turn.output && <Text xstyle={styles.text} color="secondary">{turn.output}</Text>}

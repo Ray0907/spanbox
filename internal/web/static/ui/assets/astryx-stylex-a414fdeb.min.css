@@ -7845,6 +7845,10 @@
       flex-direction: column;
     }
 
+    .x15zctf7 {
+      flex-direction: row-reverse;
+    }
+
     .x1iyjqo2 {
       flex-grow: 1;
     }
@@ -7867,6 +7871,10 @@
 
     .x1r5qhvw {
       grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    }
+
+    .xvc5jky {
+      margin-inline-start: auto;
     }
 
     .xj0a0fe {
