@@ -1,49 +1,19 @@
 package web
 
 import (
-	"bytes"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"math"
 	"mime"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Ray0907/spanbox/internal/store"
 )
-
-//go:embed templates/*.html static/*
-var webFiles embed.FS
-
-type layoutData struct {
-	Title      string
-	Section    string
-	SQLEnabled bool
-	Charts     bool
-	Version    string
-}
-
-type traceFilterView struct {
-	Range, From, To, Model, Service, MinDuration, Session, User string
-	Errors                                                      bool
-}
-
-type tracesPage struct {
-	layoutData
-	Rows      []store.TraceRow
-	Filter    traceFilterView
-	NextURL   string
-	ExportURL template.URL
-	Partial   bool
-	Error     string
-}
 
 func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet || r.URL.Path != "/" {
@@ -54,65 +24,37 @@ func (deps Deps) traces(w http.ResponseWriter, r *http.Request) {
 		deps.agentTraces(w, r)
 		return
 	}
-	filter, view, err := traceFilter(r)
-	query := cloneValues(r.URL.Query())
-	query.Del("cursor")
-	query.Del("partial")
-	page := tracesPage{layoutData: layoutData{Title: "Traces", Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Filter: view, ExportURL: template.URL("/export?" + query.Encode()), Partial: r.URL.Query().Get("partial") == "1"}
-	if err == nil {
-		page.Rows, err = deps.Store.ListTraces(r.Context(), filter)
-		if len(page.Rows) > 50 {
-			last := page.Rows[49]
-			page.Rows = page.Rows[:50]
-			query := cloneValues(r.URL.Query())
-			query.Del("partial")
-			query.Set("cursor", strconv.FormatInt(last.StartNs, 10)+":"+last.TraceID)
-			page.NextURL = "/?" + query.Encode()
-		}
-	}
-	if err != nil {
-		page.Error = err.Error()
-	}
-	if r.URL.Query().Get("partial") == "1" {
-		deps.render(w, "results", page, "templates/traces_rows.html")
-		return
-	}
-	deps.render(w, "base", page, "templates/base.html", "templates/traces.html", "templates/traces_rows.html")
+	serveShell(w, r, http.StatusOK)
 }
 
-func traceFilter(r *http.Request) (store.TraceFilter, traceFilterView, error) {
+func traceFilter(r *http.Request) (store.TraceFilter, error) {
 	query := r.URL.Query()
-	view := traceFilterView{
-		Range: query.Get("range"), From: query.Get("from"), To: query.Get("to"), Model: query.Get("model"),
-		Service: query.Get("service"), MinDuration: query.Get("min_duration"), Session: query.Get("session"),
-		User: query.Get("user"), Errors: query.Get("errors") == "1",
-	}
-	from, to, err := parseRange(view.Range, view.From, view.To)
+	from, to, err := parseRange(query.Get("range"), query.Get("from"), query.Get("to"))
 	if err != nil {
-		return store.TraceFilter{}, view, err
+		return store.TraceFilter{}, err
 	}
 	filter := store.TraceFilter{
-		FromNs: from, ToNs: to, Model: view.Model, Service: view.Service, ErrorsOnly: view.Errors,
-		SessionID: view.Session, UserID: view.User, Limit: 51,
+		FromNs: from, ToNs: to, Model: query.Get("model"), Service: query.Get("service"), ErrorsOnly: query.Get("errors") == "1",
+		SessionID: query.Get("session"), UserID: query.Get("user"), Limit: 51,
 	}
-	if view.MinDuration != "" {
-		filter.MinDurationMs, err = strconv.ParseFloat(view.MinDuration, 64)
+	if duration := query.Get("min_duration"); duration != "" {
+		filter.MinDurationMs, err = strconv.ParseFloat(duration, 64)
 		if err != nil || filter.MinDurationMs < 0 || math.IsNaN(filter.MinDurationMs) || math.IsInf(filter.MinDurationMs, 0) {
-			return store.TraceFilter{}, view, fmt.Errorf("minimum duration must be a non-negative number")
+			return store.TraceFilter{}, fmt.Errorf("minimum duration must be a non-negative number")
 		}
 	}
 	if cursor := query.Get("cursor"); cursor != "" {
 		start, traceID, ok := strings.Cut(cursor, ":")
 		if !ok || len(traceID) != 32 {
-			return store.TraceFilter{}, view, fmt.Errorf("invalid cursor")
+			return store.TraceFilter{}, fmt.Errorf("invalid cursor")
 		}
 		filter.CursorStartNs, err = strconv.ParseInt(start, 10, 64)
 		if err != nil {
-			return store.TraceFilter{}, view, fmt.Errorf("invalid cursor")
+			return store.TraceFilter{}, fmt.Errorf("invalid cursor")
 		}
 		filter.CursorTraceID = traceID
 	}
-	return filter, view, nil
+	return filter, nil
 }
 
 func parseRange(value, fromText, toText string) (int64, int64, error) {
@@ -143,29 +85,6 @@ func parseRange(value, fromText, toText string) (int64, int64, error) {
 	}
 }
 
-func cloneValues(values url.Values) url.Values {
-	copy := make(url.Values, len(values))
-	for key, value := range values {
-		copy[key] = append([]string(nil), value...)
-	}
-	return copy
-}
-
-type spanNode struct {
-	Span      store.Span
-	OffsetPct int
-	WidthPct  int
-	Children  []*spanNode
-}
-
-type tracePage struct {
-	layoutData
-	Trace      store.TraceRow
-	Roots      []*spanNode
-	TimeLabels []string
-	Selected   *spanView
-}
-
 func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -184,76 +103,7 @@ func (deps Deps) trace(w http.ResponseWriter, r *http.Request) {
 		deps.agentTrace(w, r, traceID)
 		return
 	}
-	trace, spans, err := deps.Store.GetTrace(r.Context(), traceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			http.NotFound(w, r)
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-	roots := buildTree(spans, trace.StartNs, trace.EndNs)
-	page := tracePage{
-		layoutData: layoutData{Title: trace.Name, Section: "traces", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version},
-		Trace:      trace, Roots: roots, TimeLabels: timeLabels(trace.StartNs, trace.EndNs),
-	}
-	if len(spans) > 0 {
-		selectedSpan, err := deps.Store.GetSpan(r.Context(), traceID, spans[0].SpanID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		selected := newSpanView(selectedSpan, trace.StartNs)
-		page.Selected = &selected
-	}
-	deps.render(w, "base", page, "templates/base.html", "templates/trace.html", "templates/span.html")
-}
-
-func buildTree(spans []store.Span, traceStart, traceEnd int64) []*spanNode {
-	nodes := make(map[string]*spanNode, len(spans))
-	window := traceEnd - traceStart
-	for _, span := range spans {
-		node := &spanNode{Span: span, WidthPct: 100}
-		if window > 0 {
-			node.OffsetPct = min(max(int(math.Round(float64(span.StartNs-traceStart)*100/float64(window))), 0), 99)
-			node.WidthPct = max(int(math.Round(float64(span.EndNs-span.StartNs)*100/float64(window))), 1)
-			node.WidthPct = min(node.WidthPct, 100-node.OffsetPct)
-		}
-		nodes[span.SpanID] = node
-	}
-	var roots []*spanNode
-	for _, span := range spans {
-		node := nodes[span.SpanID]
-		if parent := nodes[span.ParentSpanID]; span.ParentSpanID != "" && parent != nil {
-			parent.Children = append(parent.Children, node)
-		} else {
-			roots = append(roots, node)
-		}
-	}
-	return roots
-}
-
-func timeLabels(start, end int64) []string {
-	durationMs := max(float64(end-start)/1e6, 0)
-	return []string{"0 ms", compactDuration(durationMs * .25), compactDuration(durationMs * .5), compactDuration(durationMs * .75), compactDuration(durationMs)}
-}
-
-func compactDuration(ms float64) string {
-	if ms >= 1000 {
-		return fmt.Sprintf("%.1fs", ms/1000)
-	}
-	return fmt.Sprintf("%.0fms", ms)
-}
-
-type sessionsPage struct {
-	layoutData
-	Rows    []store.SessionRow
-	Range   string
-	From    string
-	To      string
-	NextURL string
-	Error   string
+	serveShell(w, r, http.StatusOK)
 }
 
 func (deps Deps) sessions(w http.ResponseWriter, r *http.Request) {
@@ -262,47 +112,14 @@ func (deps Deps) sessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("format") == "json" {
-		deps.agentSessions(w, r)
-		return
-	}
-	if id := r.URL.Query().Get("id"); id != "" {
-		deps.sessionDetail(w, r, id)
-		return
-	}
-	page := sessionsPage{layoutData: layoutData{Title: "Sessions", Section: "sessions", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Range: r.URL.Query().Get("range"), From: r.URL.Query().Get("from"), To: r.URL.Query().Get("to")}
-	from, to, err := parseRange(page.Range, page.From, page.To)
-	filter := store.SessionFilter{FromNs: from, ToNs: to, Limit: 51}
-	if err == nil && r.URL.Query().Get("cursor") != "" {
-		last, sessionID, ok := strings.Cut(r.URL.Query().Get("cursor"), ":")
-		if !ok || sessionID == "" {
-			err = fmt.Errorf("invalid cursor")
-		} else if filter.CursorLastNs, err = strconv.ParseInt(last, 10, 64); err != nil {
-			err = fmt.Errorf("invalid cursor")
+		if id := r.URL.Query().Get("id"); id != "" {
+			deps.sessionDetail(w, r, id)
 		} else {
-			filter.CursorSessionID = sessionID
+			deps.agentSessions(w, r)
 		}
+		return
 	}
-	if err == nil {
-		page.Rows, err = deps.Store.ListSessions(r.Context(), filter)
-		if len(page.Rows) > 50 {
-			last := page.Rows[49]
-			page.Rows = page.Rows[:50]
-			query := cloneValues(r.URL.Query())
-			query.Set("cursor", strconv.FormatInt(last.LastNs, 10)+":"+last.SessionID)
-			page.NextURL = "/sessions?" + query.Encode()
-		}
-	}
-	if err != nil {
-		page.Error = err.Error()
-	}
-	deps.render(w, "base", page, "templates/base.html", "templates/sessions.html")
-}
-
-type dashboardPage struct {
-	layoutData
-	Range string
-	Data  store.DashboardData
-	Error string
+	serveShell(w, r, http.StatusOK)
 }
 
 func (deps Deps) dashboard(w http.ResponseWriter, r *http.Request) {
@@ -310,19 +127,7 @@ func (deps Deps) dashboard(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	rangeValue := r.URL.Query().Get("range")
-	if rangeValue == "" {
-		rangeValue = "24h"
-	}
-	from, to, err := parseRange(rangeValue, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
-	page := dashboardPage{layoutData: layoutData{Title: "Dashboard", Section: "dashboard", SQLEnabled: deps.Cfg.AuthToken != "", Charts: true, Version: deps.Version}, Range: rangeValue}
-	if err == nil {
-		page.Data, err = deps.Store.Dashboard(r.Context(), from, to)
-	}
-	if err != nil {
-		page.Error = err.Error()
-	}
-	deps.render(w, "base", page, "templates/base.html", "templates/dashboard.html")
+	serveShell(w, r, http.StatusOK)
 }
 
 func (deps Deps) dashboardData(w http.ResponseWriter, r *http.Request) {
@@ -354,13 +159,6 @@ func (deps Deps) dashboardData(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-type searchPage struct {
-	layoutData
-	Query string
-	Hits  []store.SearchHit
-	Error string
-}
-
 func (deps Deps) search(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -370,74 +168,75 @@ func (deps Deps) search(w http.ResponseWriter, r *http.Request) {
 		deps.agentSearch(w, r)
 		return
 	}
-	page := searchPage{layoutData: layoutData{Title: "Search", Section: "search", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version}, Query: r.URL.Query().Get("q")}
-	var err error
-	if page.Query != "" {
-		page.Hits, err = deps.Store.Search(r.Context(), page.Query, 100)
-	}
-	if err != nil {
-		page.Error = err.Error()
-	}
-	deps.render(w, "base", page, "templates/base.html", "templates/search.html")
+	serveShell(w, r, http.StatusOK)
 }
 
 type schemaTable struct {
-	Name    string
-	Columns []string
-}
-
-type sqlPage struct {
-	layoutData
-	Query     string
-	Result    store.SQLResult
-	HasResult bool
-	Error     string
-	Schema    []schemaTable
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"`
 }
 
 func (deps Deps) sqlPage(w http.ResponseWriter, r *http.Request) {
+	jsonMode := sqlJSON(r)
+	fail := func(status int, message string) {
+		if jsonMode {
+			writeAgentError(w, status, message)
+		} else {
+			http.Error(w, message, status)
+		}
+	}
 	if deps.Cfg.AuthToken == "" {
-		http.Error(w, "SQL console disabled: set AUTH_TOKEN to enable", http.StatusNotFound)
+		fail(http.StatusNotFound, "SQL console disabled: set AUTH_TOKEN to enable")
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	page := sqlPage{layoutData: layoutData{Title: "SQL", Section: "sql", SQLEnabled: true, Version: deps.Version}}
-	var err error
-	page.Schema, err = deps.schema(r)
+	schema, err := deps.schema(r)
 	if err != nil {
 		deps.Logf("inspect schema: %v", err)
-		http.Error(w, "database error", http.StatusInternalServerError)
+		fail(http.StatusInternalServerError, "database error")
 		return
 	}
 	status := http.StatusOK
+	var result store.SQLResult
+	var queryError string
 	if r.Method == http.MethodPost {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || mediaType != "application/x-www-form-urlencoded" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+			fail(http.StatusUnsupportedMediaType, "unsupported media type")
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 20<<10)
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form", http.StatusBadRequest)
+			fail(http.StatusBadRequest, "invalid form")
 			return
 		}
-		page.Query = r.PostForm.Get("sql")
-		page.Result, err = deps.Store.RunUserSQL(r.Context(), page.Query)
+		result, err = deps.Store.RunUserSQL(r.Context(), r.PostForm.Get("sql"))
 		if err != nil {
-			page.Error = err.Error()
+			queryError = err.Error()
 			status = http.StatusBadRequest
-		} else {
-			page.HasResult = true
 		}
 	}
-	if status != http.StatusOK {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(status)
+	if jsonMode {
+		if r.Method == http.MethodGet {
+			writeAgentJSON(w, status, map[string]any{"tables": schema})
+		} else {
+			if result.Columns == nil {
+				result.Columns = []string{}
+			}
+			if result.Rows == nil {
+				result.Rows = [][]string{}
+			}
+			writeAgentJSON(w, status, map[string]any{
+				"columns": result.Columns, "rows": result.Rows,
+				"truncated": result.Truncated, "error": queryError,
+			})
+		}
+		return
 	}
-	deps.render(w, "base", page, "templates/base.html", "templates/sql.html")
+	serveShell(w, r, status)
 }
 
 func (deps Deps) schema(r *http.Request) ([]schemaTable, error) {
@@ -486,132 +285,5 @@ func (deps Deps) span(w http.ResponseWriter, r *http.Request) {
 		deps.agentSpan(w, r, parts[0], parts[1])
 		return
 	}
-	span, err := deps.Store.GetSpan(r.Context(), parts[0], parts[1])
-	if err != nil {
-		if err == sql.ErrNoRows {
-			http.NotFound(w, r)
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-	trace, _, err := deps.Store.GetTrace(r.Context(), parts[0])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	deps.render(w, "span", newSpanView(span, trace.StartNs), "templates/span.html")
-}
-
-type messageView struct {
-	Role, Content string
-}
-
-type contentView struct {
-	Label, Text string
-	Present     bool
-	Messages    []messageView
-}
-
-type spanView struct {
-	Span                                       store.Span
-	Status                                     string
-	StartOffsetMs                              float64
-	Input, Output                              contentView
-	Attributes, Events, Links, Resource, Scope string
-}
-
-func newSpanView(span store.Span, traceStart int64) spanView {
-	status := map[int32]string{0: "Unset", 1: "OK", 2: "Error"}[span.StatusCode]
-	return spanView{
-		Span: span, Status: status, StartOffsetMs: max(float64(span.StartNs-traceStart)/1e6, 0),
-		Input: formatContent("Input", span.InputContent), Output: formatContent("Output", span.OutputContent),
-		Attributes: prettyJSON(span.Attributes), Events: prettyJSON(span.Events), Links: prettyJSON(span.Links),
-		Resource: prettyJSON(span.Resource), Scope: prettyJSON(span.Scope),
-	}
-}
-
-func formatContent(label, raw string) contentView {
-	view := contentView{Label: label, Text: raw, Present: raw != ""}
-	if raw == "" {
-		return view
-	}
-	var value any
-	if json.Unmarshal([]byte(raw), &value) == nil {
-		view.Text = prettyJSON(raw)
-		view.Messages = messages(value)
-	}
-	return view
-}
-
-func messages(value any) []messageView {
-	if object, ok := value.(map[string]any); ok {
-		value = object["messages"]
-		if text, ok := value.(string); ok {
-			_ = json.Unmarshal([]byte(text), &value)
-		}
-	}
-	items, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]messageView, 0, len(items))
-	for _, item := range items {
-		object, ok := item.(map[string]any)
-		if !ok {
-			return nil
-		}
-		role, _ := object["role"].(string)
-		content, exists := object["content"]
-		if !exists {
-			content = object["parts"]
-		}
-		if role == "" {
-			role = "message"
-		}
-		result = append(result, messageView{Role: role, Content: partsText(content)})
-	}
-	return result
-}
-
-// partsText renders OTel GenAI message parts as plain text when every part is
-// a text part; anything else falls back to indented JSON.
-func partsText(content any) string {
-	parts, ok := content.([]any)
-	if !ok || len(parts) == 0 {
-		return textValue(content)
-	}
-	var texts []string
-	for _, part := range parts {
-		object, ok := part.(map[string]any)
-		if !ok {
-			return textValue(content)
-		}
-		kind, _ := object["type"].(string)
-		text, isText := object["content"].(string)
-		if !isText {
-			text, isText = object["text"].(string)
-		}
-		if (kind != "" && kind != "text") || !isText {
-			return textValue(content)
-		}
-		texts = append(texts, text)
-	}
-	return strings.Join(texts, "\n\n")
-}
-
-func textValue(value any) string {
-	if text, ok := value.(string); ok {
-		return text
-	}
-	body, _ := json.MarshalIndent(value, "", "  ")
-	return string(body)
-}
-
-func prettyJSON(value string) string {
-	var output bytes.Buffer
-	if json.Indent(&output, []byte(value), "", "  ") == nil {
-		return output.String()
-	}
-	return value
+	serveShell(w, r, http.StatusOK)
 }

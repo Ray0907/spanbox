@@ -21,14 +21,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-      - run: npm install -g pnpm@12.11.2
-      - name: build web-ui
-        run: |
-          pnpm --dir web-ui install --frozen-lockfile
-          pnpm --dir web-ui build
       - name: build
         env:
           GOOS: ${{ matrix.goos }}

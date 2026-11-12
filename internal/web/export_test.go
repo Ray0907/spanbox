@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -105,23 +103,11 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if persisted.OutputContent != decoded.OutputContent {
 		t.Fatalf("upsert did not overwrite content: %q", persisted.OutputContent)
 	}
+	// The filtered export link is built in the React Traces page; e2e-mobile checks that it keeps every active filter.
 	for _, path := range []string{"/?" + query, "/?" + query + "&partial=1"} {
 		page := exportRequest(h, "GET", path, "", nil)
-		_, after, ok := strings.Cut(html.UnescapeString(page.Body.String()), `id="export-link" href="/export?`)
-		if !ok {
-			t.Fatalf("missing filtered export link for %s: %s", path, page.Body.String())
-		}
-		href, _, _ := strings.Cut(after, `"`)
-		params, err := url.ParseQuery(href)
-		if err != nil {
-			t.Fatal(err)
-		}
-		want, _ := url.ParseQuery(query)
-		if params.Encode() != want.Encode() {
-			t.Fatalf("export link query = %q, want %q", href, query)
-		}
-		if strings.Contains(path, "partial=1") && !strings.Contains(page.Body.String(), `hx-swap-oob="outerHTML"`) {
-			t.Fatal("filter refresh does not update export link")
+		if page.Code != 200 || !strings.Contains(page.Body.String(), `id="root"`) {
+			t.Fatalf("%s is not the app shell: %d", path, page.Code)
 		}
 	}
 	for _, param := range []string{"model=missing", "service=missing", "errors=0&model=missing", "min_duration=1001", "session=missing", "user=missing"} {

@@ -1,7 +1,7 @@
 /* spanbox palette mapped onto Astryx tokens. Values from spanbox app.css (dark, light). */
 @font-face{font-family:"Bricolage Grotesque";font-weight:200 800;font-stretch:75% 100%;font-display:swap;src:url(/bricolage-grotesque-latin.woff2) format("woff2")}
 @font-face{font-family:"Source Sans 3";font-weight:200 900;font-display:swap;src:url(/source-sans-3-latin.woff2) format("woff2")}
-[data-astryx-theme="neutral"] {
+:root, [data-astryx-theme="neutral"] {
   --color-background-body: light-dark(#f7f3f5, #09080b);
   --color-background-surface: light-dark(#fffdfd, #111014);
   --color-background-card: light-dark(#fffdfd, #111014);
@@ -16,6 +16,8 @@
   --color-text-accent: light-dark(#a90f58, #ff5caa);
   --color-icon-accent: light-dark(#a90f58, #ff5caa);
   --color-accent-muted: light-dark(#f9deea, #321422);
+  --color-info-muted: var(--color-accent-muted);
+  --color-on-info-muted: var(--color-text-accent);
   --color-on-accent: light-dark(#ffffff, #1c0a13);
   --color-error: light-dark(#a82932, #ff8b8f);
   --color-text-error: light-dark(#a82932, #ff8b8f);
@@ -31,3 +33,32 @@
   --font-family-body: "Source Sans 3", -apple-system, "Segoe UI", Arial, sans-serif;
   --font-family-heading: "Bricolage Grotesque", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
 }
+html { color-scheme: light dark; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+html, body { overscroll-behavior: none; }
+body { margin: 0; min-height: 100dvh; background: var(--color-background-body); color: var(--color-text-primary); }
+[data-astryx-theme] { min-height: 100dvh; }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 12px; background: var(--color-background-body); transform: translateY(-200%); }
+.skip-link:focus { transform: translateY(0); }
+nav[aria-label="Primary"] { padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+main { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); overflow-wrap: anywhere; }
+main, main * { min-width: 0; }
+input, select, textarea { font-size: max(1rem, var(--text-body-size, 1rem)) !important; }
+button, a, summary, [role="button"], [role="tab"], [role="radio"] { touch-action: manipulation; }
+button, nav a, summary, [role="button"], [role="tab"], [role="radio"] { user-select: none; -webkit-user-select: none; }
+:is(button, a[href], summary, select, [role="button"], [role="tab"], [role="radio"], [role="option"], [role="checkbox"], [role="switch"], [role="combobox"]:not(input), input[type="checkbox"], input[type="radio"], .astryx-checkbox-input:not(:has(:disabled, [aria-disabled="true"]))):not(:disabled, [aria-disabled="true"], [aria-disabled="true"] *) { cursor: pointer; }
+button { min-height: 44px; }
+nav a, td a, main > a, .turn-card a, .session-totals a, .search-results a { display: inline-flex; align-items: center; min-height: 44px; }
+.span-tree, .span-panel { overscroll-behavior: contain; overflow: auto; }
+.span-panel { position: sticky; top: 56px; max-height: calc(100dvh - 72px); }
+.span-tree button[data-span-id] > span:first-child,
+.span-tree button[data-span-id] > span:first-child > span:first-child { width: 100%; white-space: normal; }
+.span-tree button[data-span-id][aria-current="true"] { background: var(--color-background-muted); border-left-color: var(--color-accent); }
+.waterfall { width: 100%; height: 8px; background: var(--color-background-muted); }
+@media (max-width: 640px) {
+  .span-panel { position: static; max-height: none; }
+  .waterfall { grid-column: 1 / -1; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .span-tree button[data-span-id]:hover { background: var(--color-background-muted); }
+}
+a:active, button:active, summary:active, tbody tr:active { opacity: .8; }

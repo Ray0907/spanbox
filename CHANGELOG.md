@@ -3,11 +3,17 @@
 ## Unreleased
 
 ### Added
-- Experimental UI at `/ui` for the trace list and trace detail, built from `web-ui/` and embedded in the binary. It reads the existing `?format=json` endpoints with the login cookie, so it adds no data route, and it works under the unchanged CSP. Release binaries and the container image include it. A source build includes it after `pnpm --dir web-ui install --frozen-lockfile && pnpm --dir web-ui build` before `go build`; without that step `/ui` returns 404.
 - Session detail page at `/sessions?id=<session>`: the session's traces oldest first, one card per trace with the agent root's prompt and latest output, span count, tokens, cost and a link to the trace. Traces without an agent root (orphan tool traces, pre-v4 session traces) are listed but not numbered as turns. The Sessions list links the session ID to this page and the trace count to the filtered trace list. No schema change.
 
 ### Changed
 - Go raised to 1.26.11 and `golang.org/x/net`, `google.golang.org/grpc` and `github.com/klauspost/compress` raised to versions that clear known vulnerabilities. CI now runs `govulncheck` and fails on a new reachable one.
+- Full Astryx UI for traces/spans, sessions, search, dashboard, SQL and login, with keyboard/mobile support and system light/dark themes. The built UI (`internal/web/static/ui`) is committed and embedded, so `go install`, release binaries and the Docker image need no Node; CI rebuilds it and fails when the committed build is stale. JSON APIs and CSP are unchanged.
+- Traces and Sessions custom ranges use date and time pickers (UTC, 24-hour, quarter-hour presets with typed entry); clickable controls show a pointer cursor, excluding disabled controls and text inputs. `from`/`to` URLs are unchanged. Search results are a divided list with the time at the end of each header row and matches shown with a tinted `mark` instead of `[brackets]`; the phrase field fills the row.
+- Range on Traces, Sessions and Dashboard is a menu (Astryx `Selector`) at every width, so each option can be chosen by tap on a phone; Sessions custom `from`/`to` use the same UTC date-and-time pickers as Traces, filters are laid out Range, then From and To, then the rest, and Search hit times end in `UTC`. URLs are unchanged.
+- Failed login POST returns 401 with the app shell; non-JSON POST `/sql` returns the shell instead of query-result markup.
+
+### Removed
+- htmx, `html/template` pages and legacy static assets; retired static URLs return 404.
 
 ## 0.5.0 — 2026-10-17
 

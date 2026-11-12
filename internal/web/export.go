@@ -44,7 +44,7 @@ func (deps Deps) exportSpans(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	filter, _, err := traceFilter(r)
+	filter, err := traceFilter(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

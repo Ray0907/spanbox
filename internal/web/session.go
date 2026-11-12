@@ -25,7 +25,6 @@ type sessionSummary struct {
 }
 
 type sessionPage struct {
-	layoutData
 	SessionID string
 	Turns     []sessionTurnView
 	Summary   sessionSummary
@@ -73,16 +72,15 @@ func summarize(turns []sessionTurnView) sessionSummary {
 func (deps Deps) sessionDetail(w http.ResponseWriter, r *http.Request, sessionID string) {
 	rows, err := deps.Store.ListSessionTurns(r.Context(), sessionID, sessionTextChars, sessionTurnLimit+1)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		agentStoreError(w, err)
 		return
 	}
 	if len(rows) == 0 {
-		http.NotFound(w, r)
+		writeAgentError(w, http.StatusNotFound, "not found")
 		return
 	}
 	page := sessionPage{
-		layoutData: layoutData{Title: "Session " + sessionID, Section: "sessions", SQLEnabled: deps.Cfg.AuthToken != "", Version: deps.Version},
-		SessionID:  sessionID,
+		SessionID: sessionID,
 	}
 	if len(rows) > sessionTurnLimit {
 		rows, page.Truncated = rows[:sessionTurnLimit], true
@@ -97,5 +95,5 @@ func (deps Deps) sessionDetail(w http.ResponseWriter, r *http.Request, sessionID
 		page.Turns = append(page.Turns, view)
 	}
 	page.Summary = summarize(page.Turns)
-	deps.render(w, "base", page, "templates/base.html", "templates/session.html")
+	writeAgentSessionDetail(w, page)
 }

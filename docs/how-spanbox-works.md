@@ -6,7 +6,7 @@ spanbox is one process with one HTTP port (default `4318`). It receives spans, n
 
 ```
 OTLP exporters ─┐
-OTLP logs ──────┤                         ┌─ web UI (HTML)
+OTLP logs ──────┤                         ┌─ Astryx UI
 Vendor proxy ───┴─► decode ─► normalize ─►│ SQLite ─┼─ JSON API
 Import (NDJSON) ─────────────────────────►│         ├─ SSE /events
                                           └─────────┴─ SQL console
@@ -16,7 +16,7 @@ Import (NDJSON) ─────────────────────�
 2. **Normalize.** `internal/normalize` flattens attributes into columns: provider, models, token counts, input and output content, tool name, session and user, finish reason. It assigns each span a `kind`: `llm`, `embedding`, `tool`, `retrieval`, `agent`, or `other`.
 3. **Price.** `internal/pricing` computes `cost_usd` from the embedded LiteLLM price table when the span carries token counts but no cost. `cost_source` records where the number came from. See [Update model pricing](pricing.md).
 4. **Store.** `internal/store` upserts into SQLite. Spans are unique on `(trace_id, span_id)`, so re-sent spans update in place. A `traces` table holds per-trace aggregates.
-5. **Serve.** `internal/web` renders HTML, JSON, the SSE stream, and the SQL console from the same store.
+5. **Serve.** `internal/web` serves the embedded Astryx app shell and assets. The UI reads the same store through `?format=json` data routes and `/dashboard/data`; SSE uses `/events`, and SQL queries use the JSON console API.
 
 ## Two capture paths
 
@@ -38,7 +38,7 @@ A span's `session_id` comes from the proxy header `X-Spanbox-Session`, then `gen
 
 ## Where reads come from
 
-Lists (`/`, `/sessions`, `/search`) page with opaque cursors. The dashboard reads a covering index and never touches span bodies. Search selects a page of matches from the FTS index before reading bodies. This keeps reads fast while ingest continues.
+JSON lists (`/?format=json`, `/sessions?format=json`, `/search?format=json`) page with opaque cursors. The dashboard reads a covering index and never touches span bodies. Search selects a page of matches from the FTS index before reading bodies. This keeps reads fast while ingest continues.
 
 ## Single writer
 

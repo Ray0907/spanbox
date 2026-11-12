@@ -1,6 +1,7 @@
 package web
 
 import (
+	"embed"
 	"fmt"
 	"io/fs"
 	"log"
@@ -16,6 +17,13 @@ import (
 )
 
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+//go:embed static/ui
+var webFiles embed.FS
+
+// spaPaths lists page routes; true also includes their child paths.
+var spaPaths = map[string]bool{"/traces": true, "/spans": true, "/sessions": true, "/search": true,
+	"/dashboard": false, "/sql": false, "/login": false, "/": false}
 
 type Deps struct {
 	Cfg         config.Config
@@ -84,22 +92,16 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	staticHandler := http.FileServer(http.FS(staticFiles))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/")
-		if path == "htmx.min.js" || path == "uPlot.min.js" || path == "uPlot.min.css" || strings.HasPrefix(path, "fonts/") {
+		// Build assets are content-hashed and fonts never change in place.
+		if p := r.URL.Path; strings.HasPrefix(p, "ui/assets/") || strings.HasPrefix(p, "ui/") && strings.HasSuffix(p, ".woff2") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
 		staticHandler.ServeHTTP(w, r)
 	})))
-	mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
-		page, err := fs.ReadFile(staticFiles, "ui/index.html")
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		_, _ = w.Write(page)
+	shell := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serveShell(w, r, http.StatusOK)
 	})
+	mux.Handle("/ui", shell)
 	mux.HandleFunc("/traces/", deps.trace)
 	mux.HandleFunc("/spans/", deps.span)
 	mux.HandleFunc("/sessions", deps.sessions)
@@ -117,7 +119,34 @@ func NewHandler(deps Deps) http.Handler {
 		}
 		deps.traces(w, r)
 	})
-	return headers(recoverPanics(deps.Logf, authenticate(deps.Cfg.AuthToken, mux)))
+	return headers(recoverPanics(deps.Logf, authenticate(deps.Cfg.AuthToken, serveSPAPages(mux, shell, deps.Cfg.AuthToken != ""))))
+}
+
+func serveShell(w http.ResponseWriter, r *http.Request, status int) {
+	page, err := webFiles.ReadFile("static/ui/index.html")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_, _ = w.Write(page)
+}
+
+func serveSPAPages(next, shell http.Handler, sqlEnabled bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Query().Get("format") != "json" &&
+			(r.URL.Path != "/sql" || sqlEnabled && !sqlJSON(r)) {
+			for prefix, children := range spaPaths {
+				if r.URL.Path == prefix || children && strings.HasPrefix(r.URL.Path, prefix+"/") {
+					shell.ServeHTTP(w, r)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func NewServer(deps Deps) *http.Server {

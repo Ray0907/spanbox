@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,6 +22,23 @@ func writeAgentJSON(w http.ResponseWriter, status int, value any) {
 
 func writeAgentError(w http.ResponseWriter, status int, message string) {
 	writeAgentJSON(w, status, map[string]string{"error": message})
+}
+
+func sqlJSON(r *http.Request) bool {
+	if r.URL.Query().Get("format") == "json" {
+		return true
+	}
+	for _, accept := range strings.Split(r.Header.Get("Accept"), ",") {
+		mediaType, params, err := mime.ParseMediaType(strings.TrimSpace(accept))
+		if err != nil || mediaType != "application/json" {
+			continue
+		}
+		if q, err := strconv.ParseFloat(params["q"], 64); err == nil && q <= 0 {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func agentNumber(text string, fallback, maximum int) (int, error) {
@@ -81,7 +99,7 @@ func (deps Deps) agentTraces(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, 400, err.Error())
 		return
 	}
-	filter, _, err := traceFilter(r)
+	filter, err := traceFilter(r)
 	if err != nil {
 		writeAgentError(w, 400, err.Error())
 		return
@@ -151,6 +169,24 @@ func (deps Deps) agentSessions(w http.ResponseWriter, r *http.Request) {
 	writeAgentJSON(w, 200, page)
 }
 
+func writeAgentSessionDetail(w http.ResponseWriter, page sessionPage) {
+	traces := make([]map[string]any, 0, len(page.Turns))
+	for _, turn := range page.Turns {
+		trace := agentTraceSummary(turn.TraceRow)
+		trace["has_root"], trace["number"] = turn.HasRoot, turn.Number
+		trace["prompt"], trace["output"] = turn.Prompt, turn.Output
+		traces = append(traces, trace)
+	}
+	writeAgentJSON(w, http.StatusOK, map[string]any{
+		"session_id": page.SessionID, "traces": traces, "truncated": page.Truncated,
+		"totals": map[string]any{
+			"turns": page.Summary.Turns, "traces": page.Summary.Traces,
+			"input_tokens": page.Summary.InputTokens, "output_tokens": page.Summary.OutputTokens,
+			"cost_usd": page.Summary.CostUSD,
+		},
+	})
+}
+
 func (deps Deps) agentSearch(w http.ResponseWriter, r *http.Request) {
 	limit, err := agentLimit(r)
 	if err != nil {
@@ -169,12 +205,17 @@ func (deps Deps) agentSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	var cursor []store.SearchHit
 	if text != "" {
-		start, spanID, err := agentCursor(text, 8)
+		stamp, ids, _ := strings.Cut(text, ":")
+		spanID, traceID, hasTrace := strings.Cut(ids, ":")
+		start, spanID, err := agentCursor(stamp+":"+spanID, 8)
+		if err == nil && hasTrace {
+			_, traceID, err = agentCursor("0:"+traceID, 16)
+		}
 		if err != nil {
 			writeAgentError(w, 400, err.Error())
 			return
 		}
-		cursor = []store.SearchHit{{StartNs: start, SpanID: spanID}}
+		cursor = []store.SearchHit{{StartNs: start, SpanID: spanID, TraceID: traceID}}
 	}
 	var rows []store.SearchHit
 	if sort == "relevance" {
@@ -186,7 +227,7 @@ func (deps Deps) agentSearch(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, 500, err.Error())
 		return
 	}
-	page := agentPage(rows, limit, func(row store.SearchHit) string { return fmt.Sprintf("%d:%s", row.StartNs, row.SpanID) })
+	page := agentPage(rows, limit, func(row store.SearchHit) string { return fmt.Sprintf("%d:%s:%s", row.StartNs, row.SpanID, row.TraceID) })
 	items := make([]map[string]any, 0, min(len(rows), limit))
 	for _, row := range rows[:min(len(rows), limit)] {
 		items = append(items, map[string]any{
@@ -261,7 +302,9 @@ func textWindow(text string, offset, length int) agentWindow {
 func (deps Deps) agentSpan(w http.ResponseWriter, r *http.Request, traceID, spanID string) {
 	q := r.URL.Query()
 	field := q.Get("field")
-	if field != "" && field != "input" && field != "output" && field != "attributes" {
+	switch field {
+	case "", "input", "output", "attributes", "events", "links", "resource", "scope":
+	default:
 		writeAgentError(w, 400, "invalid field")
 		return
 	}
@@ -296,7 +339,10 @@ func (deps Deps) agentSpan(w http.ResponseWriter, r *http.Request, traceID, span
 		"input_tokens": span.InputTokens, "output_tokens": span.OutputTokens, "cost_usd": span.CostUSD,
 		"status_code": span.StatusCode, "status_message": span.StatusMessage,
 	}
-	for name, text := range map[string]string{"input": span.InputContent, "output": span.OutputContent, "attributes": span.Attributes} {
+	for name, text := range map[string]string{
+		"input": span.InputContent, "output": span.OutputContent, "attributes": span.Attributes,
+		"events": span.Events, "links": span.Links, "resource": span.Resource, "scope": span.Scope,
+	} {
 		if field == "" || field == name {
 			result[name] = textWindow(text, offset, length)
 		}

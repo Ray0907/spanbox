@@ -11,8 +11,6 @@ import (
 	"strings"
 )
 
-const loginFailure = "Invalid token."
-
 func tokenEqual(a, b string) bool {
 	aHash := sha256.Sum256([]byte(a))
 	bHash := sha256.Sum256([]byte(b))
@@ -84,7 +82,7 @@ func authenticate(token string, next http.Handler) http.Handler {
 			return
 		}
 		agentRoute := r.URL.Path == "/" || r.URL.Path == "/sessions" || r.URL.Path == "/search" || strings.HasPrefix(r.URL.Path, "/traces/") || strings.HasPrefix(r.URL.Path, "/spans/")
-		agentJSON := r.URL.Path == "/events" || r.URL.Path == "/dashboard/data" || agentRoute && r.URL.Query().Get("format") == "json"
+		agentJSON := r.URL.Path == "/events" || r.URL.Path == "/dashboard/data" || agentRoute && r.URL.Query().Get("format") == "json" || r.URL.Path == "/sql" && sqlJSON(r)
 		if agentJSON {
 			if provided, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tokenEqual(provided, token) {
 				next.ServeHTTP(w, r)
@@ -104,22 +102,10 @@ func authenticate(token string, next http.Handler) http.Handler {
 	})
 }
 
-type loginPage struct {
-	Error string
-}
-
-func (deps Deps) renderLogin(w http.ResponseWriter, status int, errorMessage string) {
-	if status != http.StatusOK {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(status)
-	}
-	deps.render(w, "login", loginPage{Error: errorMessage}, "templates/login.html")
-}
-
 func (deps Deps) login(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		deps.renderLogin(w, http.StatusOK, "")
+		serveShell(w, r, http.StatusOK)
 	case http.MethodPost:
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || mediaType != "application/x-www-form-urlencoded" {
@@ -133,11 +119,11 @@ func (deps Deps) login(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
 				return
 			}
-			deps.renderLogin(w, http.StatusUnauthorized, loginFailure)
+			serveShell(w, r, http.StatusUnauthorized)
 			return
 		}
 		if !tokenEqual(r.PostForm.Get("token"), deps.Cfg.AuthToken) {
-			deps.renderLogin(w, http.StatusUnauthorized, loginFailure)
+			serveShell(w, r, http.StatusUnauthorized)
 			return
 		}
 		http.SetCookie(w, &http.Cookie{

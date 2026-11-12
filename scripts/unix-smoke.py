@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Check a built Unix binary: OTLP ingest/read and zero-exit SIGINT/SIGTERM.
 
-With --require-ui, also check that /ui and the /static/ui assets it references answer 200.
+With --require-ui, also check that the app shell on the SPA routes and every /static/ui script,
+stylesheet and font it references answer 200 with a body.
 """
 from http.client import HTTPConnection
 import json
@@ -47,14 +48,22 @@ def check_ui(port):
         response = conn.getresponse()
         return response.status, response.read().decode("utf-8", "replace")
 
-    status, page = get("/ui")
-    assert status == 200 and 'id="root"' in page, ("/ui", status)
-    assets = sorted(set(re.findall(r'(?:src|href)="(/static/ui/[^"]+\.(?:js|css))"', page)))
-    assert assets, "/ui references no /static/ui script or stylesheet"
-    for asset in assets:
-        assert get(asset)[0] == 200, (asset, "not served")
+    assets = set()
+    for route in ("/", "/traces"):
+        status, page = get(route)
+        assert status == 200 and 'id="root"' in page, (route, status)
+        found = set(re.findall(r'(?:src|href)="(/static/ui/[^"]+\.(?:js|css))"', page))
+        assert any(a.endswith(".js") for a in found) and any(a.endswith(".css") for a in found), (route, found)
+        assets |= found
+    # fonts are referenced from the stylesheets, not the shell
+    for asset in sorted(assets):
+        if asset.endswith(".css"):
+            assets |= set(re.findall(r"url\((/static/ui/[^)]+)\)", get(asset)[1]))
+    for asset in sorted(assets):
+        status, body = get(asset)
+        assert status == 200 and body, (asset, status, "not served")
     conn.close()
-    print("PASS /ui shell and " + str(len(assets)) + " referenced assets answer 200", flush=True)
+    print("PASS app shell on / and /traces and " + str(len(assets)) + " referenced assets answer 200", flush=True)
 
 
 for shutdown_signal in (signal.SIGINT, signal.SIGTERM):

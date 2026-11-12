@@ -48,7 +48,7 @@ func seedSession(t *testing.T, database *store.Store) {
 func TestSessionDetailPage(t *testing.T) {
 	handler, database := newTestHandler(t, "")
 	seedSession(t, database)
-	response := request(t, handler, http.MethodGet, "/sessions?id="+url.QueryEscape(sessionTestID), "", "", nil)
+	response := request(t, handler, http.MethodGet, "/sessions?id="+url.QueryEscape(sessionTestID)+"&format=json", "", "", nil)
 	body := response.Body.String()
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%q", response.Code, body)
@@ -57,7 +57,7 @@ func TestSessionDetailPage(t *testing.T) {
 	positions := []int{
 		strings.Index(body, "execute_tool lost"),
 		strings.Index(body, "first prompt"),
-		strings.Index(body, "second &lt;script&gt;"),
+		strings.Index(body, `second \u003cscript\u003e`),
 		strings.Index(body, "third prompt"),
 	}
 	for i := 1; i < len(positions); i++ {
@@ -65,23 +65,23 @@ func TestSessionDetailPage(t *testing.T) {
 			t.Fatalf("cards missing or out of order: %v", positions)
 		}
 	}
-	for _, want := range []string{"Turn 1", "Turn 2", "Turn 3", "answer to first prompt", `href="/traces/` + strings.Repeat("a", 32) + `"`} {
+	for _, want := range []string{`"number":1`, `"number":2`, `"number":3`, "answer to first prompt", `"trace_id":"` + strings.Repeat("a", 32) + `"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in %q", want, body)
 		}
 	}
-	// Totals are plain text, not button-like chips; durations are compact.
-	if !strings.Contains(body, `class="session-totals"`) || strings.Contains(body, "trace-summary") || !strings.Contains(body, "<span>1ms</span>") {
-		t.Fatalf("totals/duration markup not as designed: %q", body)
+	// Markup, compact durations and accessible labels are checked in e2e-mobile/sessions-search.cjs.
+	if !strings.Contains(body, `"totals":{"cost_usd":null,"input_tokens":null,"output_tokens":null,"traces":4,"turns":3}`) || !strings.Contains(body, `"duration_ms":1`) {
+		t.Fatalf("totals/duration JSON not as designed: %q", body)
 	}
-	if strings.Contains(body, "Turn 4") || strings.Contains(body, "<script>x</script>") || strings.Contains(body, "chat other") {
+	if strings.Contains(body, `"number":4`) || strings.Contains(body, "<script>x</script>") || strings.Contains(body, "chat other") {
 		t.Fatalf("unexpected content (extra turn, unescaped prompt or foreign session): %q", body)
 	}
 }
 
 func TestSessionDetailUnknownSession(t *testing.T) {
 	handler, _ := newTestHandler(t, "")
-	response := request(t, handler, http.MethodGet, "/sessions?id=nope", "", "", nil)
+	response := request(t, handler, http.MethodGet, "/sessions?id=nope&format=json", "", "", nil)
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("status=%d", response.Code)
 	}
@@ -90,17 +90,14 @@ func TestSessionDetailUnknownSession(t *testing.T) {
 func TestSessionsListLinksToDetail(t *testing.T) {
 	handler, database := newTestHandler(t, "")
 	seedSession(t, database)
-	body := request(t, handler, http.MethodGet, "/sessions", "", "", nil).Body.String()
-	if !strings.Contains(body, `href="/sessions?id=sess%2fwith%20slash"`) && !strings.Contains(body, `href="/sessions?id=sess%2Fwith+slash"`) {
-		t.Fatalf("session id does not link to the detail page: %q", body)
+	page := agentGet(t, handler, "/sessions?format=json")
+	for _, item := range page["items"].([]any) {
+		row := item.(map[string]any)
+		if row["session_id"] == sessionTestID && row["trace_count"] == float64(4) {
+			return // Detail/filter links and their accessible names are checked in e2e-mobile.
+		}
 	}
-	if !strings.Contains(body, `href="/?session=`) {
-		t.Fatalf("trace filter link was removed: %q", body)
-	}
-	// The count link must say what it counts when read out of its table cell.
-	if !strings.Contains(body, `aria-label="4 traces in sess/with slash"`) {
-		t.Fatalf("trace count link has no descriptive name: %q", body)
-	}
+	t.Fatalf("missing session ID/count: %v", page)
 }
 
 func TestSessionDetailMarksClippedTextAndNamesLinks(t *testing.T) {
@@ -111,20 +108,13 @@ func TestSessionDetailMarksClippedTextAndNamesLinks(t *testing.T) {
 	if _, err := database.InsertBatch(context.Background(), []store.Span{root}); err != nil {
 		t.Fatal(err)
 	}
-	body := request(t, handler, http.MethodGet, "/sessions?id="+url.QueryEscape(sessionTestID), "", "", nil).Body.String()
+	body := request(t, handler, http.MethodGet, "/sessions?id="+url.QueryEscape(sessionTestID)+"&format=json", "", "", nil).Body.String()
 	// Cut at 600 characters, and the cut must be visible.
 	if !strings.Contains(body, strings.Repeat("x", 599)+"y…") || strings.Contains(body, "yz") {
 		t.Fatalf("clipped prompt is not marked: %q", body)
 	}
-	if !strings.Contains(body, "1 turn · 1 trace ·") || !strings.Contains(body, "<span>1 span</span>") {
-		t.Fatalf("singular counts not handled: %q", body)
+	if !strings.Contains(body, `"traces":1,"turns":1`) || !strings.Contains(body, `"span_count":1`) || !strings.Contains(body, `"number":1`) || !strings.Contains(body, `"cost_usd":null`) {
+		t.Fatalf("counts/number/unknown cost lost: %q", body)
 	}
-	// A repeated link text needs a name that tells the cards apart.
-	if !strings.Contains(body, `aria-label="Open trace for Turn 1"`) {
-		t.Fatalf("trace link has no distinct accessible name: %q", body)
-	}
-	// An unknown cost is left out instead of shown as a bare dash.
-	if strings.Contains(body, "$") || strings.Contains(body, "<span>—</span>") {
-		t.Fatalf("unknown cost rendered: %q", body)
-	}
+	// Singular labels, named links and omitted unknown costs are checked in e2e-mobile.
 }
